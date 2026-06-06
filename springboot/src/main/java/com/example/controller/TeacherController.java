@@ -19,12 +19,14 @@ public class TeacherController {
     @GetMapping("/selectAll")
     public Result selectAll(Teacher teacher) {
         List<Teacher> list = teacherService.selectAll(teacher);
+        list.forEach(this::clearPassword);
         return Result.success(list);
     }
 
     @GetMapping("/selectByteacher_ID/{teacher_ID}")
     public Result selectByteacher_ID(@PathVariable Integer teacher_ID) {
         Teacher teacher = teacherService.selectByteacher_ID(teacher_ID);
+        clearPassword(teacher);
         return Result.success(teacher);
     }
 
@@ -33,6 +35,7 @@ public class TeacherController {
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
         PageInfo<Teacher> pageInfo = teacherService.selectPage(teacher, pageNum, pageSize);
+        pageInfo.getList().forEach(this::clearPassword);
         return Result.success(pageInfo);
     }
 
@@ -63,6 +66,13 @@ public class TeacherController {
     @GetMapping("/selectByTeam_ID/{team_ID}")
     public Result selectByTeam_ID(@PathVariable Integer team_ID) {
         List<Teacher> list = teacherService.selectByTeam_ID(team_ID);
+        list.forEach(this::clearPassword);
         return Result.success(list);
+    }
+
+    private void clearPassword(Teacher teacher) {
+        if (teacher != null) {
+            teacher.setPassword(null);
+        }
     }
 }

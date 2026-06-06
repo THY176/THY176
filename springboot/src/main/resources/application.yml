@@ -1,5 +1,8 @@
 server:
   port: 2026
+auth:
+  jwt-secret: ${TEAMAPPLY_JWT_SECRET:teamapply-dev-secret-change-me-please}
+  jwt-expire-seconds: 7200
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver

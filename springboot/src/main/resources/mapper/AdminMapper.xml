@@ -38,8 +38,13 @@
 
     <update id="updateByteacher_ID" parameterType="com.example.entity.Admin">
         UPDATE `admin`
-        SET name = #{name}, password = #{password}, tele = #{tele},
-            gender = #{gender}, age = #{age}
+        <set>
+            name = #{name},
+            <if test="password != null and password != ''">password = #{password},</if>
+            tele = #{tele},
+            gender = #{gender},
+            age = #{age}
+        </set>
         WHERE teacher_ID = #{teacher_ID}
     </update>
 

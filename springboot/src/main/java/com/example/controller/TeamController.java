@@ -19,12 +19,14 @@ public class TeamController {
     @GetMapping("/selectAll")
     public Result selectAll(Team team) {
         List<Team> list = teamService.selectAll(team);
+        list.forEach(this::clearPassword);
         return Result.success(list);
     }
 
     @GetMapping("/selectByteam_ID/{team_ID}")
     public Result selectByteam_ID(@PathVariable Integer team_ID) {
         Team team = teamService.selectByteam_ID(team_ID);
+        clearPassword(team);
         return Result.success(team);
     }
 
@@ -33,6 +35,7 @@ public class TeamController {
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
         PageInfo<Team> pageInfo = teamService.selectPage(team, pageNum, pageSize);
+        pageInfo.getList().forEach(this::clearPassword);
         return Result.success(pageInfo);
     }
 
@@ -63,12 +66,20 @@ public class TeamController {
     @GetMapping("/selectByteacher_ID/{teacher_ID}")
     public Result selectByteacher_ID(@PathVariable Integer teacher_ID) {
         List<Team> list = teamService.selectByteacher_ID(teacher_ID);
+        list.forEach(this::clearPassword);
         return Result.success(list);
     }
 
     @GetMapping("/selectByteam_name")
     public Result selectByteam_name(@RequestParam String team_name) {
         List<Team> list = teamService.selectByteam_name(team_name);
+        list.forEach(this::clearPassword);
         return Result.success(list);
+    }
+
+    private void clearPassword(Team team) {
+        if (team != null) {
+            team.setPassword(null);
+        }
     }
 }

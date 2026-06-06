@@ -19,12 +19,14 @@ public class AdminController {
     @GetMapping("/selectAll")
     public Result selectAll(Admin admin) {
         List<Admin> list = adminService.selectAll(admin);
+        list.forEach(this::clearPassword);
         return Result.success(list);
     }
 
     @GetMapping("/selectByteacher_ID/{teacher_ID}")
     public Result selectByteacher_ID(@PathVariable Integer teacher_ID) {
         Admin admin = adminService.selectByteacher_ID(teacher_ID);
+        clearPassword(admin);
         return Result.success(admin);
     }
 
@@ -33,6 +35,7 @@ public class AdminController {
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
         PageInfo<Admin> pageInfo = adminService.selectPage(admin, pageNum, pageSize);
+        pageInfo.getList().forEach(this::clearPassword);
         return Result.success(pageInfo);
     }
 
@@ -58,5 +61,11 @@ public class AdminController {
     public Result delBatch(@RequestBody List<Integer> teacher_IDs) {
         adminService.delBatch(teacher_IDs);
         return Result.success();
+    }
+
+    private void clearPassword(Admin admin) {
+        if (admin != null) {
+            admin.setPassword(null);
+        }
     }
 }

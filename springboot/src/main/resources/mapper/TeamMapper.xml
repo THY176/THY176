@@ -51,8 +51,13 @@
 
     <update id="updateByteam_ID" parameterType="com.example.entity.Team">
         update `team`
-        set teacher_ID = #{teacher_ID}, team_name = #{team_name}, password = #{password},
-            number = #{number}, time = #{time}
+        <set>
+            teacher_ID = #{teacher_ID},
+            team_name = #{team_name},
+            <if test="password != null and password != ''">password = #{password},</if>
+            number = #{number},
+            time = #{time}
+        </set>
         where team_ID = #{team_ID}
     </update>
 

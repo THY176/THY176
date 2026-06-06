@@ -15,6 +15,9 @@ public class TeamService {
     @Resource
     private TeamMapper teamMapper;
 
+    @Resource
+    private PasswordService passwordService;
+
     public List<Team> selectAll(Team team) {
         return teamMapper.selectAll(team);
     }
@@ -30,10 +33,12 @@ public class TeamService {
     }
 
     public void add(Team team) {
+        team.setPassword(passwordService.encodeIfNeeded(team.getPassword()));
         teamMapper.insert(team);
     }
 
     public void update(Team team) {
+        team.setPassword(passwordService.encodeIfNeeded(team.getPassword()));
         teamMapper.updateByteam_ID(team);
     }
 

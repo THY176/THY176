@@ -15,6 +15,9 @@ public class AdminService {
     @Resource
     private AdminMapper adminMapper;
 
+    @Resource
+    private PasswordService passwordService;
+
     public List<Admin> selectAll(Admin admin) {
         return adminMapper.selectAll(admin);
     }
@@ -30,10 +33,12 @@ public class AdminService {
     }
 
     public void add(Admin admin) {
+        admin.setPassword(passwordService.encodeIfNeeded(admin.getPassword()));
         adminMapper.insert(admin);
     }
 
     public void update(Admin admin) {
+        admin.setPassword(passwordService.encodeIfNeeded(admin.getPassword()));
         adminMapper.updateByteacher_ID(admin);
     }
 

@@ -15,6 +15,9 @@ public class TeacherService {
     @Resource
     private TeacherMapper teacherMapper;
 
+    @Resource
+    private PasswordService passwordService;
+
     public List<Teacher> selectAll(Teacher teacher) {
         return teacherMapper.selectAll(teacher);
     }
@@ -30,10 +33,12 @@ public class TeacherService {
     }
 
     public void add(Teacher teacher) {
+        teacher.setPassword(passwordService.encodeIfNeeded(teacher.getPassword()));
         teacherMapper.insert(teacher);
     }
 
     public void update(Teacher teacher) {
+        teacher.setPassword(passwordService.encodeIfNeeded(teacher.getPassword()));
         teacherMapper.updateByteacher_ID(teacher);
     }
 

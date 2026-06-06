@@ -49,10 +49,10 @@
 </template>
 
 <script setup>
-import { reactive, ref, nextTick } from "vue"
-import request from "@/utils/request.js"
+import { reactive, ref } from 'vue'
+import request from '@/utils/request.js'
 import { useUserStore } from '@/stores/user.js'
-import { ElMessage } from "element-plus"
+import { ElMessage } from 'element-plus'
 
 const userStore = useUserStore()
 
@@ -71,81 +71,33 @@ const rules = {
 const formRef = ref()
 const loading = ref(false)
 
+const routeMap = {
+  admin: '/admin',
+  teacher: '/teacher',
+  team: '/team'
+}
+
 const handleLogin = () => {
   formRef.value.validate((valid) => {
     if (!valid) return
 
     loading.value = true
 
-    const { account, password, role } = formData
-
-    let apiUrl = ''
-    if (role === 'team') {
-      apiUrl = '/team/selectByteam_ID/' + account
-    } else if (role === 'teacher') {
-      apiUrl = '/teacher/selectByteacher_ID/' + account
-    } else if (role === 'admin') {
-      apiUrl = '/admin/selectByteacher_ID/' + account
-    }
-
-    request.get(apiUrl).then(res => {
-      if (res.code !== '200' || !res.data) {
-        ElMessage.error('账号不存在')
+    request.post('/auth/login', {
+      account: Number(formData.account),
+      password: formData.password,
+      role: formData.role
+    }).then(res => {
+      if (res.code !== '200' || !res.data?.token || !res.data?.userInfo) {
+        ElMessage.error(res.msg || '登录失败')
         return
       }
 
-      const userData = res.data
-      console.log('后端返回的用户数据:', userData)
-
-      if (userData.password !== password) {
-        ElMessage.error('密码错误')
-        return
-      }
-
-      // 修复：确保 teacher_ID 有值
-      if (role === 'teacher' && !userData.teacher_ID) {
-        userData.teacher_ID = parseInt(account);
-        console.log('手动设置 teacher_ID:', userData.teacher_ID);
-      }
-
-      // 修复：确保 admin 的 teacher_ID 有值
-      if (role === 'admin' && !userData.teacher_ID) {
-        userData.teacher_ID = parseInt(account);
-        console.log('手动设置 admin teacher_ID:', userData.teacher_ID);
-      }
-
-      // 修复：确保 team 的 team_ID 有值
-      if (role === 'team' && !userData.team_ID) {
-        userData.team_ID = parseInt(account);
-        console.log('手动设置 team_ID:', userData.team_ID);
-      }
-
-      // 保存用户信息
-      userStore.setUserInfo(userData, role)
-
-      // 保存用户信息
-      userStore.setUserInfo(userData, role)
-
-      // 等待一下确保数据保存完成
-      setTimeout(() => {
-        console.log('保存后的 userId:', userStore.userId)
-        console.log('保存后的 userInfo:', userStore.userInfo)
-
-        ElMessage.success('登录成功')
-
-        // 跳转
-        if (role === 'admin') {
-          window.location.href = '/admin'
-        } else if (role === 'teacher') {
-          window.location.href = '/teacher'
-        } else if (role === 'team') {
-          window.location.href = '/team'
-        }
-      }, 100)
-
+      userStore.setUserInfo(res.data.userInfo, res.data.token)
+      ElMessage.success('登录成功')
+      window.location.href = routeMap[formData.role]
     }).catch(err => {
       console.error('登录请求错误:', err)
-      ElMessage.error('登录请求失败')
     }).finally(() => {
       loading.value = false
     })

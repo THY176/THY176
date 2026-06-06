@@ -46,8 +46,14 @@
 
     <update id="updateByteacher_ID" parameterType="com.example.entity.Teacher">
         update `teacher`
-        set team_ID = #{team_ID}, name = #{name}, password = #{password}, tele = #{tele},
-            gender = #{gender}, age = #{age}
+        <set>
+            team_ID = #{team_ID},
+            name = #{name},
+            <if test="password != null and password != ''">password = #{password},</if>
+            tele = #{tele},
+            gender = #{gender},
+            age = #{age}
+        </set>
         where teacher_ID = #{teacher_ID}
     </update>
 </mapper>
