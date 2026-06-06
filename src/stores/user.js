@@ -4,13 +4,32 @@ import { ref, computed } from 'vue'
 export const useUserStore = defineStore('user', () => {
     const token = ref(localStorage.getItem('token') || '')
 
+    const normalizeUserInfo = (data, fallbackAccount) => {
+        const userData = { ...(data || {}) }
+        delete userData.password
+
+        if (userData.role === 'team') {
+            userData.team_ID = userData.team_ID || userData.teamId || userData.id || fallbackAccount || null
+            userData.id = userData.id || userData.team_ID
+        }
+
+        if (userData.role === 'teacher' || userData.role === 'admin') {
+            userData.teacher_ID = userData.teacher_ID || userData.teacherId || userData.id || fallbackAccount || null
+            userData.id = userData.id || userData.teacher_ID
+        }
+
+        return userData
+    }
+
     const parseUserInfo = () => {
         try {
             const stored = localStorage.getItem('userInfo')
             if (stored && stored !== 'undefined' && stored !== 'null' && stored !== '{}') {
                 const parsed = JSON.parse(stored)
                 if (parsed && parsed.role) {
-                    return parsed
+                    const normalized = normalizeUserInfo(parsed)
+                    localStorage.setItem('userInfo', JSON.stringify(normalized))
+                    return normalized
                 }
             }
         } catch (e) {
@@ -29,10 +48,10 @@ export const useUserStore = defineStore('user', () => {
         if (!info || !info.role) return null
 
         if (info.role === 'team') {
-            return info.team_ID || null
+            return info.team_ID || info.teamId || info.id || null
         }
         if (info.role === 'teacher' || info.role === 'admin') {
-            return info.teacher_ID || null
+            return info.teacher_ID || info.teacherId || info.id || null
         }
         return null
     })
@@ -50,9 +69,8 @@ export const useUserStore = defineStore('user', () => {
         return '未知用户'
     })
 
-    const setUserInfo = (data, authToken) => {
-        const userData = { ...data }
-        delete userData.password
+    const setUserInfo = (data, authToken, fallbackAccount) => {
+        const userData = normalizeUserInfo(data, fallbackAccount)
 
         userInfo.value = userData
         token.value = authToken || ''
@@ -62,8 +80,7 @@ export const useUserStore = defineStore('user', () => {
     }
 
     const updateUserInfo = (updates) => {
-        const updated = { ...userInfo.value, ...updates }
-        delete updated.password
+        const updated = normalizeUserInfo({ ...userInfo.value, ...updates })
 
         userInfo.value = updated
         localStorage.setItem('userInfo', JSON.stringify(updated))

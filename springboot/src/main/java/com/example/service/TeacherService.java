@@ -38,6 +38,10 @@ public class TeacherService {
     }
 
     public void update(Teacher teacher) {
+        if (teacher == null || teacher.getTeacher_ID() == null) {
+            throw new RuntimeException("教师工号不能为空");
+        }
+
         teacher.setPassword(passwordService.encodeIfNeeded(teacher.getPassword()));
         teacherMapper.updateByteacher_ID(teacher);
     }

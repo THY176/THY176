@@ -93,7 +93,7 @@ const handleLogin = () => {
         return
       }
 
-      userStore.setUserInfo(res.data.userInfo, res.data.token)
+      userStore.setUserInfo(res.data.userInfo, res.data.token, Number(formData.account))
       ElMessage.success('登录成功')
       window.location.href = routeMap[formData.role]
     }).catch(err => {

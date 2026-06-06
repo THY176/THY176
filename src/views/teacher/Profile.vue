@@ -101,8 +101,13 @@ const handleUpdate = () => {
   const userId = userStore.userId
   const userRole = userStore.role
 
+  if (!userId) {
+    ElMessage.error('未获取到用户工号，请重新登录')
+    return
+  }
+
   const updateData = {
-    teacher_ID: formData.teacher_ID,
+    teacher_ID: formData.teacher_ID || userId,
     name: formData.name,
     tele: formData.tele,
     gender: formData.gender,

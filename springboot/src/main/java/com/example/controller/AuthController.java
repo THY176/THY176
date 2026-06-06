@@ -67,6 +67,7 @@ public class AuthController {
 
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("role", "team");
+        userInfo.put("id", team.getTeam_ID());
         userInfo.put("team_ID", team.getTeam_ID());
         userInfo.put("team_name", team.getTeam_name());
         userInfo.put("teacher_ID", team.getTeacher_ID());
@@ -86,6 +87,7 @@ public class AuthController {
 
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("role", "teacher");
+        userInfo.put("id", teacher.getTeacher_ID());
         userInfo.put("teacher_ID", teacher.getTeacher_ID());
         userInfo.put("name", teacher.getName());
         userInfo.put("team_ID", teacher.getTeam_ID());
@@ -106,6 +108,7 @@ public class AuthController {
 
         Map<String, Object> userInfo = new HashMap<>();
         userInfo.put("role", "admin");
+        userInfo.put("id", admin.getTeacher_ID());
         userInfo.put("teacher_ID", admin.getTeacher_ID());
         userInfo.put("name", admin.getName());
         userInfo.put("tele", admin.getTele());
