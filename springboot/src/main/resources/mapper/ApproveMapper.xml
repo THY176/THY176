@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.ApproveMapper">
+    <resultMap id="approveMap" type="com.example.entity.Approve">
+        <result column="approve_ID" property="approve_ID"/>
+        <result column="apply_ID" property="apply_ID"/>
+        <result column="teacher_ID" property="teacher_ID"/>
+        <result column="teacher_name" property="teacher_name"/>
+        <result column="role" property="role"/>
+        <result column="opinion" property="opinion"/>
+        <result column="sequence" property="sequence"/>
+        <result column="approve_time" property="approve_time"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <select id="selectByapprove_ID" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE approve_ID = #{approve_ID}
+    </select>
+
+    <select id="selectByApply_ID" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE apply_ID = #{apply_ID}
+    </select>
+
+    <select id="selectByStatus" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE status = #{status}
+    </select>
+
+    <select id="selectByTeacher_ID" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE teacher_ID = #{teacher_ID}
+    </select>
+
+    <select id="selectByRole" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE role = #{role}
+    </select>
+
+    <select id="selectByApply_IDAndSequence" resultMap="approveMap">
+        SELECT * FROM `approve` WHERE apply_ID = #{apply_ID} AND sequence = #{sequence}
+    </select>
+
+    <select id="selectAll" resultMap="approveMap">
+        select * from `approve`
+        <where>
+            <if test="approve_ID != null">
+                AND approve_ID like concat('%',#{approve_ID},'%')
+            </if>
+            <if test="apply_ID != null">
+                AND apply_ID = #{apply_ID}
+            </if>
+            <if test="teacher_ID != null">
+                AND teacher_ID = #{teacher_ID}
+            </if>
+            <if test="teacher_name != null">
+                AND teacher_name like concat('%',#{teacher_name},'%')
+            </if>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="opinion != null and opinion != ''">
+                AND opinion like concat('%',#{opinion},'%')
+            </if>
+            <if test="sequence != null">
+                AND sequence = #{sequence}
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by approve_ID desc
+    </select>
+
+    <insert id="insert" parameterType="com.example.entity.Approve" useGeneratedKeys="true" keyProperty="approve_ID">
+        insert into `approve`(apply_ID, teacher_ID, teacher_name, role, opinion, sequence, approve_time, status)
+        values (#{apply_ID}, #{teacher_ID}, #{teacher_name}, #{role}, #{opinion}, #{sequence}, #{approve_time}, #{status})
+    </insert>
+
+    <update id="updateByapprove_ID" parameterType="com.example.entity.Approve">
+        update `approve`
+        set apply_ID = #{apply_ID}, teacher_ID = #{teacher_ID}, teacher_name = #{teacher_name}, role = #{role},
+            opinion = #{opinion}, sequence = #{sequence}, approve_time = #{approve_time},
+            status = #{status}
+        where approve_ID = #{approve_ID}
+    </update>
+
+    <delete id="delBatch">
+        delete from `approve` where approve_ID in
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

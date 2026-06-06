@@ -1,0 +1,39 @@
+server:
+  port: 2026
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: tjy04085538
+    url: jdbc:mysql://localhost:3306/by?useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+flowable:
+  # 关闭异步执行器（关键配置）
+  async-executor-activate: false
+  # 关闭定时任务
+  async-executor-async-job-lock-time: 0
+  async-executor-default-async-job-acquire-wait-time: 0
+  async-executor-default-timer-job-acquire-wait-time: 0
+  # 数据库更新策略
+  database-schema-update: true
+  # 关闭历史记录（可选）
+  db-history-used: false
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.example: DEBUG
+    org.flowable: OFF
+    org.flowable.engine: OFF
+    org.flowable.task: OFF
+    org.flowable.job: OFF
+    org.flowable.spring: OFF
+    org.flowable.common: OFF
+    org.flowable.engine.impl: OFF
+    org.flowable.engine.impl.asyncexecutor: OFF

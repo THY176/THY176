@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.ReimburseMapper">
+    <resultMap id="reimburseMap" type="com.example.entity.Reimburse">
+        <result column="reimburse_ID" property="reimburse_ID"/>
+        <result column="apply_ID" property="apply_ID"/>
+        <result column="teacher_ID" property="teacher_ID"/>
+        <result column="money" property="money"/>
+        <result column="time" property="time"/>
+        <result column="status" property="status"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="reimburseMap">
+        select * from `reimburse`
+        <where>
+            <if test="reimburse_ID != null">
+                AND reimburse_ID like concat('%',#{reimburse_ID},'%')
+            </if>
+            <if test="apply_ID != null">
+                AND apply_ID = #{apply_ID}
+            </if>
+            <if test="teacher_ID != null">
+                AND teacher_ID = #{teacher_ID}
+            </if>
+            <if test="money != null and money != ''">
+                AND money like concat('%',#{money},'%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+        order by reimburse_ID desc
+    </select>
+
+    <insert id="insert" parameterType="com.example.entity.Reimburse" useGeneratedKeys="true" keyProperty="reimburse_ID">
+        insert into `reimburse`(apply_ID, teacher_ID, money, time, status)
+        values (#{apply_ID}, #{teacher_ID}, #{money}, #{time}, #{status})
+    </insert>
+
+    <update id="updateByreimburse_ID" parameterType="com.example.entity.Reimburse">
+        update `reimburse`
+        set apply_ID = #{apply_ID}, teacher_ID = #{teacher_ID}, money = #{money},
+            time = #{time}, status = #{status}
+        where reimburse_ID = #{reimburse_ID}
+    </update>
+</mapper>

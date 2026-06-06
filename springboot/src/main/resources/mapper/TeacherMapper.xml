@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.TeacherMapper">
+    <resultMap id="teacherMap" type="com.example.entity.Teacher">
+        <result column="teacher_ID" property="teacher_ID"/>
+        <result column="team_ID" property="team_ID"/>
+        <result column="name" property="name"/>
+        <result column="password" property="password"/>
+        <result column="tele" property="tele"/>
+        <result column="gender" property="gender"/>
+        <result column="age" property="age"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="teacherMap">
+        select * from `teacher`
+        <where>
+            <if test="teacher_ID != null">
+                AND teacher_ID like concat('%',#{teacher_ID},'%')
+            </if>
+            <if test="team_ID != null">
+                AND team_ID = #{team_ID}
+            </if>
+            <if test="name != null and name != ''">
+                AND name like concat('%',#{name},'%')
+            </if>
+            <if test="tele != null and tele != ''">
+                AND tele like concat('%',#{tele},'%')
+            </if>
+            <if test="gender != null and gender != ''">
+                AND gender = #{gender}
+            </if>
+            <if test="age != null">
+                AND age = #{age}
+            </if>
+        </where>
+        order by teacher_ID asc
+    </select>
+
+    <insert id="insert" parameterType="com.example.entity.Teacher">
+        insert into `teacher`(teacher_ID, team_ID, name, password, tele, gender, age)
+        values (#{teacher_ID}, #{team_ID}, #{name}, #{password}, #{tele}, #{gender}, #{age})
+    </insert>
+
+    <update id="updateByteacher_ID" parameterType="com.example.entity.Teacher">
+        update `teacher`
+        set team_ID = #{team_ID}, name = #{name}, password = #{password}, tele = #{tele},
+            gender = #{gender}, age = #{age}
+        where teacher_ID = #{teacher_ID}
+    </update>
+</mapper>

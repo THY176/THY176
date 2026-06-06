@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.StudentMapper">
+    <resultMap id="studentMap" type="com.example.entity.Student">
+        <result column="ID" property="ID"/>
+        <result column="team_ID" property="team_ID"/>
+        <result column="name" property="name"/>
+        <result column="role" property="role"/>
+        <result column="tele" property="tele"/>
+        <result column="gender" property="gender"/>
+        <result column="age" property="age"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="studentMap">
+        select * from `student`
+        <where>
+            <if test="ID != null">
+                AND ID = #{ID}
+            </if>
+            <if test="team_ID != null">
+                AND team_ID = #{team_ID}
+            </if>
+            <if test="name != null and name != ''">
+                AND name like concat('%',#{name},'%')
+            </if>
+            <if test="role != null and role != ''">
+                AND role = #{role}
+            </if>
+            <if test="tele != null and tele != ''">
+                AND tele like concat('%',#{tele},'%')
+            </if>
+            <if test="gender != null and gender != ''">
+                AND gender = #{gender}
+            </if>
+            <if test="age != null">
+                AND age = #{age}
+            </if>
+        </where>
+        order by ID asc
+    </select>
+
+    <!-- selectByID 方法不需要在 XML 中定义，因为使用了注解 -->
+
+    <insert id="insert" parameterType="com.example.entity.Student">
+        insert into `student`(ID, team_ID, name, role, tele, gender, age)
+        values (#{ID}, #{team_ID}, #{name}, #{role}, #{tele}, #{gender}, #{age})
+    </insert>
+    <insert id="replace" parameterType="com.example.entity.Student">
+        replace into `student`(ID, team_ID, name, role, tele, gender, age)
+        values (#{ID}, #{team_ID}, #{name}, #{role}, #{tele}, #{gender}, #{age})
+    </insert>
+
+    <update id="updateByID" parameterType="com.example.entity.Student">
+        update `student`
+        set team_ID = #{team_ID}, name = #{name}, role = #{role}, tele = #{tele},
+            gender = #{gender}, age = #{age}
+        where ID = #{ID}
+    </update>
+</mapper>

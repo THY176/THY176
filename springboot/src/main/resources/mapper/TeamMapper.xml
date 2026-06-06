@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.TeamMapper">
+    <resultMap id="teamMap" type="com.example.entity.Team">
+        <result column="team_ID" property="team_ID"/>
+        <result column="teacher_ID" property="teacher_ID"/>
+        <result column="team_name" property="team_name"/>
+        <result column="password" property="password"/>
+        <result column="number" property="number"/>
+        <result column="time" property="time"/>
+    </resultMap>
+
+    <select id="selectByteam_ID" resultMap="teamMap">
+        SELECT * FROM `team` WHERE team_ID = #{team_ID}
+    </select>
+
+    <select id="selectByteacher_ID" resultMap="teamMap">
+        SELECT * FROM `team` WHERE teacher_ID = #{teacher_ID}
+    </select>
+
+    <select id="selectByteam_name" resultMap="teamMap">
+        SELECT * FROM `team` WHERE team_name LIKE CONCAT('%', #{team_name}, '%')
+    </select>
+
+    <select id="selectAll" resultMap="teamMap">
+        select * from `team`
+        <where>
+            <if test="team_ID != null">
+                AND team_ID like concat('%',#{team_ID},'%')
+            </if>
+            <if test="teacher_ID != null">
+                AND teacher_ID = #{teacher_ID}
+            </if>
+            <if test="team_name != null and team_name != ''">
+                AND team_name like concat('%',#{team_name},'%')
+            </if>
+            <if test="number != null">
+                AND number = #{number}
+            </if>
+        </where>
+        order by team_ID asc
+    </select>
+
+    <insert id="insert" parameterType="com.example.entity.Team" useGeneratedKeys="true" keyProperty="team_ID">
+        insert into `team`(teacher_ID, team_name, password, number, time)
+        values (#{teacher_ID}, #{team_name}, #{password}, #{number}, #{time})
+    </insert>
+
+    <update id="updateByteam_ID" parameterType="com.example.entity.Team">
+        update `team`
+        set teacher_ID = #{teacher_ID}, team_name = #{team_name}, password = #{password},
+            number = #{number}, time = #{time}
+        where team_ID = #{team_ID}
+    </update>
+
+    <delete id="delByteam_ID">
+        delete from `team` where team_ID = #{team_ID}
+    </delete>
+
+    <update id="updateNumber">
+        update `team` set number = #{number} where team_ID = #{team_ID}
+    </update>
+</mapper>

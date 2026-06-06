@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.mapper.ApplyMapper">
+    <resultMap id="applyMap" type="com.example.entity.Apply">
+        <result column="apply_ID" property="apply_ID"/>
+        <result column="team_ID" property="team_ID"/>
+        <result column="apply_money" property="apply_money"/>
+        <result column="apply_type" property="apply_type"/>
+        <result column="reason" property="reason"/>
+        <result column="apply_time" property="apply_time"/>
+        <result column="account_name" property="account_name"/>
+        <result column="bank" property="bank"/>
+        <result column="account" property="account"/>
+        <result column="status" property="status"/>
+        <result column="tags" property="tags"/>
+        <result column="process_instance_id" property="processInstanceId"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="applyMap">
+        select * from `apply`
+        <where>
+            <if test="apply_ID != null">
+                AND apply_ID like concat('%',#{apply_ID},'%')
+            </if>
+            <if test="team_ID != null">
+                AND team_ID = #{team_ID}
+            </if>
+            <if test="apply_money != null and apply_money != ''">
+                AND apply_money like concat('%',#{apply_money},'%')
+            </if>
+            <if test="apply_type != null and apply_type != ''">
+                AND apply_type = #{apply_type}
+            </if>
+            <if test="reason != null and reason != ''">
+                AND reason like concat('%',#{reason},'%')
+            </if>
+            <if test="account_name != null and account_name != ''">
+                AND account_name like concat('%',#{account_name},'%')
+            </if>
+            <if test="bank != null and bank != ''">
+                AND bank like concat('%',#{bank},'%')
+            </if>
+            <if test="account != null and account != ''">
+                AND account like concat('%',#{account},'%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+            <if test="tags != null and tags != ''">
+                AND tags like concat('%',#{tags},'%')
+            </if>
+        </where>
+        order by apply_ID desc
+    </select>
+
+    <insert id="insert" parameterType="com.example.entity.Apply" useGeneratedKeys="true" keyProperty="apply_ID">
+        insert into `apply`(team_ID, apply_money, apply_type, reason, apply_time, account_name, bank, account, status, tags, process_instance_id)
+        values (#{team_ID}, #{apply_money}, #{apply_type}, #{reason}, #{apply_time}, #{account_name}, #{bank}, #{account}, #{status}, #{tags}, #{processInstanceId})
+    </insert>
+
+    <update id="updateByapply_ID" parameterType="com.example.entity.Apply">
+        update `apply`
+        <set>
+            <if test="team_ID != null">team_ID = #{team_ID},</if>
+            <if test="apply_money != null">apply_money = #{apply_money},</if>
+            <if test="apply_type != null">apply_type = #{apply_type},</if>
+            <if test="reason != null">reason = #{reason},</if>
+            <if test="apply_time != null">apply_time = #{apply_time},</if>
+            <if test="account_name != null">account_name = #{account_name},</if>
+            <if test="bank != null">bank = #{bank},</if>
+            <if test="account != null">account = #{account},</if>
+            <if test="status != null">status = #{status},</if>
+            <if test="tags != null">tags = #{tags},</if>
+            <if test="processInstanceId != null">process_instance_id = #{processInstanceId},</if>
+        </set>
+        where apply_ID = #{apply_ID}
+    </update>
+
+    <delete id="delBatch">
+        delete from `apply` where apply_ID in
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+</mapper>

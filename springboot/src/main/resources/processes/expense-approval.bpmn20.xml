@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://www.flowable.org/processdef">
+
+    <process id="expenseApproval" name="经费审批流程" isExecutable="true">
+
+        <startEvent id="startEvent" name="开始"/>
+
+        <userTask id="submitApply" name="提交申请" flowable:assignee="${teamId}"/>
+
+        <sequenceFlow id="flow1" sourceRef="startEvent" targetRef="submitApply"/>
+
+        <userTask id="firstAudit" name="一级审核（指导老师）" flowable:assignee="${teacherId}"/>
+
+        <sequenceFlow id="flow2" sourceRef="submitApply" targetRef="firstAudit"/>
+
+        <exclusiveGateway id="firstGateway" name="一级审核结果"/>
+
+        <sequenceFlow id="flowFirst" sourceRef="firstAudit" targetRef="firstGateway"/>
+
+        <sequenceFlow id="firstPass" sourceRef="firstGateway" targetRef="secondAudit">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '通过'}</conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="firstReject" sourceRef="firstGateway" targetRef="submitApply">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '驳回'}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- 修改：使用 assignee 动态分配 -->
+        <userTask id="secondAudit" name="二级审核（管理员）" flowable:assignee="${secondAuditAssignee}"/>
+
+        <exclusiveGateway id="secondGateway" name="二级审核结果"/>
+
+        <sequenceFlow id="flowSecond" sourceRef="secondAudit" targetRef="secondGateway"/>
+
+        <sequenceFlow id="secondPass" sourceRef="secondGateway" targetRef="thirdAudit">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '通过'}</conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="secondReject" sourceRef="secondGateway" targetRef="submitApply">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '驳回'}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- 修改：使用 assignee 动态分配 -->
+        <userTask id="thirdAudit" name="三级审核（管理员终审）" flowable:assignee="${thirdAuditAssignee}"/>
+
+        <exclusiveGateway id="thirdGateway" name="三级审核结果"/>
+
+        <sequenceFlow id="flowThird" sourceRef="thirdAudit" targetRef="thirdGateway"/>
+
+        <sequenceFlow id="thirdPass" sourceRef="thirdGateway" targetRef="reimburse">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '通过'}</conditionExpression>
+        </sequenceFlow>
+
+        <sequenceFlow id="thirdReject" sourceRef="thirdGateway" targetRef="submitApply">
+            <conditionExpression xsi:type="tFormalExpression">${auditResult == '驳回'}</conditionExpression>
+        </sequenceFlow>
+
+        <userTask id="reimburse" name="执行报销" flowable:candidateGroups="finance"/>
+
+        <sequenceFlow id="flowReimburse" sourceRef="reimburse" targetRef="endEvent"/>
+
+        <endEvent id="endEvent" name="结束"/>
+
+    </process>
+</definitions>

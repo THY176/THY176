@@ -1,0 +1,14 @@
+node_modules/
+dist/
+
+.idea/
+.vscode/
+
+springboot/target/
+
+.env
+.env.*
+!.env.example
+
+*.log
+*.tmp

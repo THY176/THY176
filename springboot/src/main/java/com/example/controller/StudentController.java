@@ -1,0 +1,134 @@
+package com.example.controller;
+
+import com.example.common.Result;
+import com.example.entity.Student;
+import com.example.service.StudentService;
+import com.github.pagehelper.PageInfo;
+import jakarta.annotation.Resource;
+import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/student")
+public class StudentController {
+
+    private static final Logger log = LoggerFactory.getLogger(StudentController.class);
+
+    @Resource
+    private StudentService studentService;
+
+    @GetMapping("/selectAll")
+    public Result selectAll(Student student) {
+        List<Student> list = studentService.selectAll(student);
+        return Result.success(list);
+    }
+
+    @GetMapping("/selectByID/{ID}")
+    public Result selectByID(@PathVariable Integer ID) {
+        Student student = studentService.selectByID(ID);
+        return Result.success(student);
+    }
+
+    @GetMapping("/selectPage")
+    public Result selectPage(Student student,
+                             @RequestParam(defaultValue = "1") Integer pageNum,
+                             @RequestParam(defaultValue = "10") Integer pageSize) {
+        PageInfo<Student> pageInfo = studentService.selectPage(student, pageNum, pageSize);
+        return Result.success(pageInfo);
+    }
+
+    @PostMapping("/add")
+    public Result add(@RequestBody Student student) {
+        log.info("新增成员请求参数: ID={}, team_ID={}, name={}", student.getID(), student.getTeam_ID(), student.getName());
+        try {
+            studentService.add(student);
+            // 更新对应社团的人数
+            if (student.getTeam_ID() != null) {
+                studentService.updateTeamNumber(student.getTeam_ID());
+            }
+            return Result.success();
+        } catch (Exception e) {
+            log.error("新增成员失败: ", e);
+            return Result.error("新增成员失败: " + e.getMessage());
+        }
+    }
+
+    @PutMapping("/update")
+    public Result update(@RequestBody Student student) {
+        log.info("更新成员请求参数: ID={}, name={}", student.getID(), student.getName());
+        try {
+            studentService.update(student);
+            return Result.success();
+        } catch (Exception e) {
+            log.error("更新成员失败: ", e);
+            return Result.error("更新成员失败: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/delByID/{ID}")
+    public Result delByID(@PathVariable Integer ID) {
+        System.out.println("=== 删除成员开始 === ID=" + ID);
+        try {
+            // 先获取成员信息
+            Student student = studentService.selectByID(ID);
+            System.out.println("查询到的 student 对象: " + student);
+            System.out.println("student.getTeam_ID(): " + (student != null ? student.getTeam_ID() : "null"));
+
+            if (student == null) {
+                return Result.error("成员不存在");
+            }
+
+            Integer teamId = student.getTeam_ID();
+            System.out.println("成员所属社团ID: " + teamId);
+
+            if (teamId == null) {
+                System.err.println("警告：成员的 team_ID 为 null，无法更新社团人数！");
+                // 仍然执行删除，但不更新人数
+                studentService.delByID(ID);
+                return Result.success("删除成功，但该成员没有关联社团，未更新人数");
+            }
+
+            // 删除前统计
+            int beforeCount = studentService.countByTeamId(teamId);
+            System.out.println("删除前社团人数: " + beforeCount);
+
+            // 执行删除
+            studentService.delByID(ID);
+            System.out.println("删除成功");
+
+            // 删除后统计
+            int afterCount = studentService.countByTeamId(teamId);
+            System.out.println("删除后社团人数(实际学生数): " + afterCount);
+
+            // 更新社团人数
+            int updatedCount = studentService.updateTeamNumber(teamId);
+            System.out.println("更新后社团表人数: " + updatedCount);
+
+            return Result.success();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("删除成员失败: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/delBatch")
+    public Result delBatch(@RequestBody List<Integer> IDs) {
+        studentService.delBatch(IDs);
+        return Result.success();
+    }
+
+    @GetMapping("/selectByTeam_ID/{team_ID}")
+    public Result selectByTeam_ID(@PathVariable Integer team_ID) {
+        List<Student> list = studentService.selectByTeam_ID(team_ID);
+        return Result.success(list);
+    }
+
+    @GetMapping("/selectByRole/{role}")
+    public Result selectByRole(@PathVariable String role) {
+        List<Student> list = studentService.selectByRole(role);
+        return Result.success(list);
+    }
+}
