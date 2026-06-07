@@ -2,7 +2,22 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export const useUserStore = defineStore('user', () => {
-    const token = ref(localStorage.getItem('token') || '')
+    const getStoredToken = () => sessionStorage.getItem('token') || ''
+    const getStoredUserInfo = () => sessionStorage.getItem('userInfo')
+    const setStoredAuth = (authToken, userData) => {
+        sessionStorage.setItem('token', authToken || '')
+        sessionStorage.setItem('userInfo', JSON.stringify(userData))
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+    }
+    const clearStoredAuth = () => {
+        sessionStorage.removeItem('token')
+        sessionStorage.removeItem('userInfo')
+        localStorage.removeItem('token')
+        localStorage.removeItem('userInfo')
+    }
+
+    const token = ref(getStoredToken())
 
     const normalizeUserInfo = (data, fallbackAccount) => {
         const userData = { ...(data || {}) }
@@ -23,12 +38,12 @@ export const useUserStore = defineStore('user', () => {
 
     const parseUserInfo = () => {
         try {
-            const stored = localStorage.getItem('userInfo')
+            const stored = getStoredUserInfo()
             if (stored && stored !== 'undefined' && stored !== 'null' && stored !== '{}') {
                 const parsed = JSON.parse(stored)
                 if (parsed && parsed.role) {
                     const normalized = normalizeUserInfo(parsed)
-                    localStorage.setItem('userInfo', JSON.stringify(normalized))
+                    sessionStorage.setItem('userInfo', JSON.stringify(normalized))
                     return normalized
                 }
             }
@@ -75,22 +90,21 @@ export const useUserStore = defineStore('user', () => {
         userInfo.value = userData
         token.value = authToken || ''
 
-        localStorage.setItem('token', token.value)
-        localStorage.setItem('userInfo', JSON.stringify(userData))
+        setStoredAuth(token.value, userData)
     }
 
     const updateUserInfo = (updates) => {
         const updated = normalizeUserInfo({ ...userInfo.value, ...updates })
 
         userInfo.value = updated
-        localStorage.setItem('userInfo', JSON.stringify(updated))
+        sessionStorage.setItem('userInfo', JSON.stringify(updated))
+        localStorage.removeItem('userInfo')
     }
 
     const logout = () => {
         token.value = ''
         userInfo.value = {}
-        localStorage.removeItem('token')
-        localStorage.removeItem('userInfo')
+        clearStoredAuth()
     }
 
     return {

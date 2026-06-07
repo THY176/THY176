@@ -38,10 +38,12 @@
 <script setup>
 import { reactive, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user.js'
 import request from '@/utils/request.js'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const userStore = useUserStore()
 const changingPassword = ref(false)
 const newPassword = ref('')
 
@@ -55,11 +57,10 @@ const formData = reactive({
 })
 
 const loadAdminInfo = () => {
-  // 直接从 localStorage 获取用户信息
-  const userInfoStr = localStorage.getItem('userInfo')
-  console.log('localStorage userInfo:', userInfoStr)
+  const teacherId = userStore.userId
+  console.log('当前管理员ID:', teacherId)
 
-  if (!userInfoStr) {
+  if (!teacherId) {
     ElMessage.error('未获取到管理员信息，请重新登录')
     setTimeout(() => {
       router.push('/')
@@ -67,38 +68,18 @@ const loadAdminInfo = () => {
     return
   }
 
-  try {
-    const userInfo = JSON.parse(userInfoStr)
-    const teacherId = userInfo.teacher_ID
-    console.log('从localStorage获取的teacher_ID:', teacherId)
-
-    if (!teacherId) {
-      ElMessage.error('未获取到管理员工号，请重新登录')
-      setTimeout(() => {
-        router.push('/')
-      }, 1500)
-      return
-    }
-
-    // 加载管理员信息
-    request.get(`/admin/selectByteacher_ID/${teacherId}`).then(res => {
-      console.log('管理员信息返回:', res)
-      if (res.code === '200' && res.data) {
-        Object.assign(formData, res.data)
-        console.log('加载后的formData:', formData)
-      } else {
-        ElMessage.error('加载管理员信息失败')
-      }
-    }).catch(err => {
-      console.error('加载管理员信息失败:', err)
+  request.get(`/admin/selectByteacher_ID/${teacherId}`).then(res => {
+    console.log('管理员信息返回:', res)
+    if (res.code === '200' && res.data) {
+      Object.assign(formData, res.data)
+      console.log('加载后的formData:', formData)
+    } else {
       ElMessage.error('加载管理员信息失败')
-    })
-
-  } catch (e) {
-    console.error('解析用户信息失败:', e)
-    ElMessage.error('解析用户信息失败')
-    router.push('/')
-  }
+    }
+  }).catch(err => {
+    console.error('加载管理员信息失败:', err)
+    ElMessage.error('加载管理员信息失败')
+  })
 }
 
 const handleUpdate = () => {
@@ -110,13 +91,7 @@ const handleUpdate = () => {
   request.put('/admin/update', updateData).then(res => {
     if (res.code === '200') {
       ElMessage.success('保存成功')
-      // 更新 localStorage 中的姓名
-      const userInfoStr = localStorage.getItem('userInfo')
-      if (userInfoStr) {
-        const userInfo = JSON.parse(userInfoStr)
-        userInfo.name = formData.name
-        localStorage.setItem('userInfo', JSON.stringify(userInfo))
-      }
+      userStore.updateUserInfo({ name: formData.name })
       changingPassword.value = false
       newPassword.value = ''
       // 重新加载

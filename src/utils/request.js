@@ -8,9 +8,17 @@ const request = axios.create({
 
 request.interceptors.request.use(
     config => {
-        const token = localStorage.getItem('token')
+        const token = sessionStorage.getItem('token')
         if (token) {
             config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`
+        }
+        if ((config.method || 'get').toLowerCase() === 'get') {
+            config.headers['Cache-Control'] = 'no-cache'
+            config.headers.Pragma = 'no-cache'
+            config.params = {
+                ...(config.params || {}),
+                _t: Date.now()
+            }
         }
         return config
     },
@@ -31,7 +39,9 @@ request.interceptors.response.use(
             return res
         }
 
-        if (res.code === '401' || res.code === '403') {
+        if (res.code === '401') {
+            sessionStorage.removeItem('token')
+            sessionStorage.removeItem('userInfo')
             localStorage.removeItem('token')
             localStorage.removeItem('userInfo')
         }
@@ -44,7 +54,9 @@ request.interceptors.response.use(
         return res
     },
     error => {
-        if (error.response?.status === 401 || error.response?.status === 403) {
+        if (error.response?.status === 401) {
+            sessionStorage.removeItem('token')
+            sessionStorage.removeItem('userInfo')
             localStorage.removeItem('token')
             localStorage.removeItem('userInfo')
             if (window.location.pathname !== '/') {
