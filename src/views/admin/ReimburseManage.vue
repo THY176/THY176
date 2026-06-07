@@ -85,7 +85,7 @@ import CommonDialog from '@/components/CommonDialog.vue'
 
 const userStore = useUserStore()
 
-const searchForm = reactive({ status: '审核通过' })
+const searchForm = reactive({ status: '' })
 const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
@@ -133,37 +133,53 @@ const getTeamName = (teamId) => {
   return clubMap.value.get(teamId) || '未知社团'
 }
 
-const load = async () => {
-  const status = searchForm.status || '审核通过'
-  const res = status === '审核通过'
-      ? await request.get('/workflow/reimburse/tasks')
-      : await request.get(`/apply/selectByStatus/${status}`)
-  if (res.code !== '200') return
+const loadApprovedList = async () => {
+  const res = await request.get('/workflow/reimburse/tasks')
+  if (res.code !== '200') return []
 
-  const list = status === '审核通过'
-      ? (res.data || []).filter(task => task.apply).map(task => ({
-        ...task.apply,
-        taskId: task.taskId,
-        taskName: task.taskName,
-        taskDefinitionKey: task.taskDefinitionKey,
-        team_name: task.teamName || task.team_name || getTeamName(task.apply.team_ID)
-      }))
-      : (res.data || [])
+  return (res.data || []).filter(task => task.apply).map(task => ({
+    ...task.apply,
+    taskId: task.taskId,
+    taskName: task.taskName,
+    taskDefinitionKey: task.taskDefinitionKey,
+    team_name: task.teamName || task.team_name || getTeamName(task.apply.team_ID)
+  }))
+}
+
+const loadReimbursedList = async () => {
+  const res = await request.get('/apply/selectByStatus/已报销')
+  if (res.code !== '200') return []
+
+  const list = res.data || []
+  for (let item of list) {
+    const rRes = await request.get(`/reimburse/selectByApply_ID/${item.apply_ID}`)
+    if (rRes.code === '200' && rRes.data?.length > 0) {
+      item.reimburse_money = rRes.data[0].money
+      item.reimburse_time = rRes.data[0].time
+    }
+  }
+  return list
+}
+
+const load = async () => {
+  const status = searchForm.status
+  let list = []
+
+  if (status === '审核通过') {
+    list = await loadApprovedList()
+  } else if (status === '已报销') {
+    list = await loadReimbursedList()
+  } else {
+    const [approvedList, reimbursedList] = await Promise.all([
+      loadApprovedList(),
+      loadReimbursedList()
+    ])
+    list = [...approvedList, ...reimbursedList]
+  }
 
   // 补充社团名称
   for (let item of list) {
     item.team_name = getTeamName(item.team_ID)
-  }
-
-  // 如果是已报销状态，获取报销信息
-  if (status === '已报销') {
-    for (let item of list) {
-      const rRes = await request.get(`/reimburse/selectByApply_ID/${item.apply_ID}`)
-      if (rRes.code === '200' && rRes.data?.length > 0) {
-        item.reimburse_money = rRes.data[0].money
-        item.reimburse_time = rRes.data[0].time
-      }
-    }
   }
 
   tableData.value = list
