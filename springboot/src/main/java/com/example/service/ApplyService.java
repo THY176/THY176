@@ -1,14 +1,19 @@
 package com.example.service;
 
 import com.example.entity.Apply;
+import com.example.entity.Approve;
 import com.example.mapper.ApplyMapper;
+import com.example.mapper.ApproveMapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import jakarta.annotation.Resource;
 import org.flowable.engine.RuntimeService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -17,6 +22,9 @@ public class ApplyService {
 
     @Resource
     private ApplyMapper applyMapper;
+
+    @Resource
+    private ApproveMapper approveMapper;
 
     @Resource
     private RuntimeService runtimeService;
@@ -47,19 +55,38 @@ public class ApplyService {
         applyMapper.updateByapply_ID(apply);
     }
 
-    public void forceStatus(Integer applyId, String status) {
+    public void updateFromWorkflow(Apply apply) {
+        applyMapper.updateByapply_ID(apply);
+    }
+
+    @Transactional
+    public void forceReject(Integer applyId, Integer adminId, String adminName, String opinion) {
         Apply existing = applyMapper.selectByapply_ID(applyId);
         if (existing == null) {
             throw new RuntimeException("申请不存在");
         }
         if (hasActiveProcess(existing)) {
-            throw new RuntimeException("该申请仍有进行中的工作流任务，不能强制修改状态");
+            runtimeService.deleteProcessInstance(
+                    existing.getProcessInstanceId(),
+                    "管理员强制驳回：" + existing.getStatus() + " -> 审核驳回"
+            );
         }
 
         Apply updateApply = new Apply();
         updateApply.setApply_ID(applyId);
-        updateApply.setStatus(status);
+        updateApply.setStatus("审核驳回");
         applyMapper.updateByapply_ID(updateApply);
+
+        Approve approve = new Approve();
+        approve.setApply_ID(applyId);
+        approve.setTeacher_ID(adminId);
+        approve.setTeacher_name(adminName);
+        approve.setRole("管理员强制驳回");
+        approve.setSequence(99);
+        approve.setOpinion((opinion == null || opinion.isBlank()) ? "管理员强制驳回" : opinion);
+        approve.setStatus("审核驳回");
+        approve.setApprove_time(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+        approveMapper.insert(approve);
     }
 
     private void validateStatusUpdate(Apply apply) {

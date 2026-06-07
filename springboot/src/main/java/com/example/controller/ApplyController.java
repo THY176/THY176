@@ -65,10 +65,13 @@ public class ApplyController {
         }
     }
 
-    @PostMapping("/forceStatus")
-    public Result forceStatus(@RequestParam Integer applyId, @RequestParam String status) {
+    @PostMapping("/forceReject")
+    public Result forceReject(@RequestParam Integer applyId,
+                              @RequestParam Integer adminId,
+                              @RequestParam String adminName,
+                              @RequestParam(required = false) String opinion) {
         try {
-            applyService.forceStatus(applyId, status);
+            applyService.forceReject(applyId, adminId, adminName, opinion);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -165,7 +168,7 @@ public class ApplyController {
             Apply updateApply = new Apply();
             updateApply.setApply_ID(applyId);
             updateApply.setProcessInstanceId(processInstanceId);
-            applyService.update(updateApply);
+            applyService.updateFromWorkflow(updateApply);
 
             return Result.success();
         } catch (Exception e) {
@@ -204,7 +207,7 @@ public class ApplyController {
             updateApply.setApply_ID(applyId);
             updateApply.setStatus("待审核");
             updateApply.setProcessInstanceId(processInstanceId);
-            applyService.update(updateApply);
+            applyService.updateFromWorkflow(updateApply);
 
             return Result.success();
         } catch (Exception e) {

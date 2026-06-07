@@ -408,6 +408,23 @@ public class WorkflowService {
             throw new RuntimeException("申请未关联工作流");
         }
 
+        if (runtimeService.createProcessInstanceQuery()
+                .processInstanceId(apply.getProcessInstanceId())
+                .active()
+                .count() == 0) {
+            Team team = teamMapper.selectByteam_ID(teamId);
+            Integer teacherId = team != null ? team.getTeacher_ID() : null;
+            if (teacherId == null) {
+                throw new RuntimeException("该社团未分配指导老师");
+            }
+
+            apply.setStatus("待审核");
+            String processInstanceId = startProcess(applyId, teamId, teacherId);
+            apply.setProcessInstanceId(processInstanceId);
+            applyMapper.updateByapply_ID(apply);
+            return;
+        }
+
         Task task = taskService.createTaskQuery()
                 .processInstanceId(apply.getProcessInstanceId())
                 .taskDefinitionKey("submitApply")

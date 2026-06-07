@@ -46,7 +46,7 @@
         </template>
         <template #action="{ row }">
           <el-button type="info" size="small" @click="viewDetail(row)">详情</el-button>
-          <el-button type="warning" size="small" @click="forceStatus(row)">强制改状态</el-button>
+          <el-button type="warning" size="small" @click="forceReject(row)">强制驳回</el-button>
           <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </CommonTable>
@@ -90,21 +90,30 @@
       </div>
     </el-dialog>
 
-    <!-- 强制改状态 -->
-    <el-dialog title="强制修改状态" v-model="statusVisible" width="400">
+    <!-- 强制驳回 -->
+    <el-dialog title="强制驳回申请" v-model="statusVisible" width="420">
+      <el-alert
+          title="强制驳回会终止当前工作流，申请将变为审核驳回，社团可编辑后重新提交。"
+          type="warning"
+          :closable="false"
+          style="margin-bottom: 12px"
+      />
       <el-form v-if="currentApply">
         <el-form-item label="当前状态">
           <el-tag>{{ currentApply.status }}</el-tag>
         </el-form-item>
-        <el-form-item label="新状态">
-          <el-select v-model="newStatus">
-            <el-option v-for="s in statusOptions" :key="s" :label="s" :value="s" />
-          </el-select>
+        <el-form-item label="驳回原因">
+          <el-input
+              v-model="rejectOpinion"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入强制驳回原因"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="statusVisible = false">取消</el-button>
-        <el-button type="warning" @click="confirmStatusChange">确认修改</el-button>
+        <el-button type="warning" @click="confirmForceReject">确认驳回</el-button>
       </template>
     </el-dialog>
   </div>
@@ -115,7 +124,9 @@ import { reactive, ref, watch } from 'vue'
 import request from '@/utils/request.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import CommonTable from '@/components/CommonTable.vue'
+import { useUserStore } from '@/stores/user.js'
 
+const userStore = useUserStore()
 const searchForm = reactive({ status: '', apply_type: '' })
 const pageNum = ref(1)
 const pageSize = ref(10)
@@ -133,8 +144,6 @@ const statusTypeMap = {
   '已报销': 'success'
 }
 
-const statusOptions = ['待提交', '待审核', '审核驳回', '待二次审核', '待三次审核', '审核通过', '已报销']
-
 const columns = [
   { prop: 'apply_ID', label: '申请编号', width: 100 },
   { prop: 'team_name', label: '社团', width: 150 },
@@ -148,7 +157,7 @@ const detailVisible = ref(false)
 const statusVisible = ref(false)
 const currentApply = ref(null)
 const auditList = ref([])
-const newStatus = ref('')
+const rejectOpinion = ref('')
 
 const loadClubs = async () => {
   const res = await request.get('/team/selectAll')
@@ -260,29 +269,32 @@ const viewDetail = async (row) => {
   }
 }
 
-const forceStatus = (row) => {
+const forceReject = (row) => {
   currentApply.value = row
-  newStatus.value = row.status
+  rejectOpinion.value = ''
   statusVisible.value = true
 }
 
-const confirmStatusChange = () => {
-  request.post('/apply/forceStatus', null, {
+const confirmForceReject = () => {
+  const userInfo = userStore.userInfo || {}
+  request.post('/apply/forceReject', null, {
     params: {
       applyId: currentApply.value.apply_ID,
-      status: newStatus.value
+      adminId: userStore.userId,
+      adminName: userInfo.name || '管理员',
+      opinion: rejectOpinion.value || '管理员强制驳回'
     }
   }).then(res => {
     if (res.code === '200') {
-      ElMessage.success('状态修改成功')
+      ElMessage.success('已强制驳回')
       statusVisible.value = false
       load()
     } else {
-      ElMessage.error(res.msg || '修改失败')
+      ElMessage.error(res.msg || '强制驳回失败')
     }
   }).catch(err => {
-    console.error('修改失败:', err)
-    ElMessage.error(err.message || '修改失败')
+    console.error('强制驳回失败:', err)
+    ElMessage.error(err.message || '强制驳回失败')
   })
 }
 

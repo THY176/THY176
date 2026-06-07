@@ -7,8 +7,8 @@
             placeholder="状态筛选"
             clearable
             style="width: 150px; margin-right: 10px"
-            @clear="load"
-            @change="load"
+            @clear="handleSearch"
+            @change="handleSearch"
         >
           <el-option label="待提交" value="待提交" />
           <el-option label="待审核" value="待审核" />
@@ -24,8 +24,8 @@
             placeholder="申请类型"
             clearable
             style="width: 150px; margin-right: 10px"
-            @clear="load"
-            @change="load"
+            @clear="handleSearch"
+            @change="handleSearch"
         >
           <el-option label="活动费" value="活动费" />
           <el-option label="比赛费" value="比赛费" />
@@ -36,7 +36,7 @@
         </el-select>
       </div>
 
-      <CommonTable :data="tableData" :columns="columns" :total="total" v-model:page-num="pageNum" v-model:page-size="pageSize" @page-change="load">
+      <CommonTable :data="tableData" :columns="columns" :total="total" v-model:page-num="pageNum" v-model:page-size="pageSize" :loading="loading" @page-change="load">
         <template #status="{ row }">
           <el-tag :type="statusTypeMap[row.status] || 'info'">
             {{ row.status }}
@@ -50,7 +50,7 @@
         <template #action="{ row }">
           <el-button type="primary" size="small" @click="viewDetail(row)">详情</el-button>
           <el-button
-              v-if="row.status === '待提交' || row.status === '待审核' || row.status === '审核驳回'"
+              v-if="row.status === '待提交' || row.status === '审核驳回'"
               type="warning"
               size="small"
               @click="editApply(row)"
@@ -117,7 +117,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onActivated, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user.js'
 import request from '@/utils/request.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -132,6 +132,7 @@ const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const tableData = ref([])
+const loading = ref(false)
 
 const statusTypeMap = {
   '待提交': 'info',
@@ -156,11 +157,12 @@ const detailVisible = ref(false)
 const currentApply = ref(null)
 const auditList = ref([])
 
-const load = () => {
+const load = async () => {
   const params = {
     pageNum: pageNum.value,
     pageSize: pageSize.value,
-    team_ID: userStore.userId
+    team_ID: userStore.userId,
+    _t: Date.now()
   }
 
   if (searchForm.status && searchForm.status !== '') {
@@ -170,12 +172,21 @@ const load = () => {
     params.apply_type = searchForm.apply_type
   }
 
-  request.get('/apply/selectPage', { params }).then(res => {
+  loading.value = true
+  try {
+    const res = await request.get('/apply/selectPage', { params })
     if (res.code === '200') {
       tableData.value = res.data.list || []
       total.value = res.data.total || 0
     }
-  })
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleSearch = () => {
+  pageNum.value = 1
+  load()
 }
 
 const viewDetail = async (row) => {
@@ -242,33 +253,42 @@ const editApply = (row) => {
 // 修改这里：调用工作流启动接口
 const submitApply = (row) => {
   ElMessageBox.confirm('确定提交该申请吗？提交后将进入审核流程', '确认提交', { type: 'info' })
-      .then(() => {
-        request.post('/apply/startWorkflow', null, {
+      .then(async () => {
+        const res = await request.post('/apply/startWorkflow', null, {
           params: { applyId: row.apply_ID }
-        }).then(res => {
-          if (res.code === '200') {
-            ElMessage.success('提交成功，等待审核')
-            load()
-          } else {
-            ElMessage.error(res.msg || '提交失败')
-          }
         })
+        if (res.code === '200') {
+          ElMessage.success('提交成功，等待审核')
+          row.status = '待审核'
+          if (searchForm.status === '待提交') {
+            tableData.value = tableData.value.filter(item => item.apply_ID !== row.apply_ID)
+            total.value = Math.max(0, total.value - 1)
+          }
+          await load()
+        } else {
+          ElMessage.error(res.msg || '提交失败')
+        }
       })
 }
 
 const deleteApply = (row) => {
   ElMessageBox.confirm('确定删除该申请吗？', '确认删除', { type: 'warning' })
-      .then(() => {
-        request.delete(`/apply/delByapply_ID/${row.apply_ID}`).then(res => {
-          if (res.code === '200') {
-            ElMessage.success('删除成功')
-            load()
-          }
-        })
+      .then(async () => {
+        const res = await request.delete(`/apply/delByapply_ID/${row.apply_ID}`)
+        if (res.code === '200') {
+          ElMessage.success('删除成功')
+          tableData.value = tableData.value.filter(item => item.apply_ID !== row.apply_ID)
+          total.value = Math.max(0, total.value - 1)
+          await load()
+        }
       })
 }
 
 onMounted(() => {
+  load()
+})
+
+onActivated(() => {
   load()
 })
 </script>
