@@ -72,6 +72,7 @@ public class AuthFilter extends OncePerRequestFilter {
             return path.startsWith("/teacher/")
                     || path.startsWith("/workflow/teacher/")
                     || path.equals("/workflow/firstAudit")
+                    || ("GET".equals(method) && path.startsWith("/workflow/currentTask/"))
                     || ("GET".equals(method) && path.startsWith("/apply/selectByapply_ID/"))
                     || ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/"))
                     || ("GET".equals(method) && path.startsWith("/approve/selectByTeacher_ID/"));
@@ -81,6 +82,7 @@ public class AuthFilter extends OncePerRequestFilter {
             return path.startsWith("/team/")
                     || path.startsWith("/student/")
                     || path.startsWith("/apply/")
+                    || ("GET".equals(method) && path.startsWith("/workflow/currentTask/"))
                     || ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/"))
                     || ("GET".equals(method) && path.startsWith("/reimburse/selectByApply_ID/"));
         }

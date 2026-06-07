@@ -134,4 +134,13 @@ public class WorkflowController {
         String status = workflowService.getCurrentStatus(processInstanceId);
         return Result.success(status);
     }
+
+    /**
+     * 获取申请当前待处理任务及已分配审批人
+     */
+    @GetMapping("/currentTask/{applyId}")
+    public Result getCurrentTask(@PathVariable Integer applyId) {
+        Map<String, Object> taskInfo = workflowService.getCurrentTaskInfo(applyId);
+        return Result.success(taskInfo);
+    }
 }

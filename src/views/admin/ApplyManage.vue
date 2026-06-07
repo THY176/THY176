@@ -79,11 +79,11 @@
           <el-timeline-item
               v-for="(item, index) in auditList"
               :key="index"
-              :type="item.status === '审核通过' ? 'success' : 'danger'"
+              :type="item.status === '审核通过' ? 'success' : item.status === '审核驳回' ? 'danger' : 'primary'"
           >
             <p><strong>第{{ item.sequence }}级审核（{{ item.role }}）</strong></p>
-            <p>审核人：{{ item.teacher_name || item.teacher_ID || '待定' }} | 时间：{{ item.approve_time }}</p>
-            <p>意见：{{ item.opinion }}</p>
+            <p>审核人：{{ item.teacher_name || item.teacher_ID || '待定' }} | 时间：{{ item.approve_time || '待审核' }}</p>
+            <p>意见：{{ item.opinion || '暂无' }}</p>
             <p>结果：{{ item.status }}</p>
           </el-timeline-item>
         </el-timeline>
@@ -206,66 +206,127 @@ watch(
     }
 )
 
+const auditRoleMap = {
+  1: '指导老师',
+  2: '二级管理员',
+  3: '三级管理员',
+  99: '管理员强制驳回'
+}
+
+const auditTime = (audit) => audit?.approve_time || ''
+
+const compareAudit = (a, b) => {
+  const timeCompare = auditTime(a).localeCompare(auditTime(b))
+  if (timeCompare !== 0) {
+    return timeCompare
+  }
+  return (a?.approve_ID || 0) - (b?.approve_ID || 0)
+}
+
+const latestAudit = (audits, filterFn = () => true) => {
+  return audits
+      .filter(audit => audit && auditTime(audit) && filterFn(audit))
+      .sort((a, b) => compareAudit(b, a))[0] || null
+}
+
+const currentAttemptAudits = (audits, terminalAudit = null) => {
+  const previousReject = latestAudit(audits, audit =>
+      audit.status === '审核驳回' &&
+      (!terminalAudit || compareAudit(audit, terminalAudit) < 0)
+  )
+
+  return audits.filter(audit =>
+      audit &&
+      auditTime(audit) &&
+      (!previousReject || compareAudit(audit, previousReject) > 0) &&
+      (!terminalAudit || compareAudit(audit, terminalAudit) <= 0)
+  )
+}
+
+const latestPassed = (audits, sequence) => {
+  return latestAudit(audits, audit =>
+      audit.sequence === sequence &&
+      audit.status === '审核通过'
+  )
+}
+
+const pendingAudit = (sequence, currentTask = null) => ({
+  sequence,
+  role: auditRoleMap[sequence],
+  teacher_ID: currentTask?.assigneeId || '',
+  teacher_name: currentTask?.assigneeName || '待定',
+  opinion: '等待处理',
+  approve_time: '',
+  status: '待审核'
+})
+
+const buildAuditTimeline = (status, audits, currentTask = null) => {
+  if (status === '待提交') {
+    return []
+  }
+
+  const latestReject = latestAudit(audits, audit => audit.status === '审核驳回')
+  if (status === '审核驳回' && latestReject) {
+    const currentAudits = currentAttemptAudits(audits, latestReject)
+    const reject = { ...latestReject }
+    if (reject.sequence === 99) {
+      const maxPassedSequence = Math.max(
+          0,
+          ...currentAudits
+              .filter(audit => audit.status === '审核通过' && audit.sequence >= 1 && audit.sequence <= 3)
+              .map(audit => audit.sequence)
+      )
+      reject.sequence = Math.min(maxPassedSequence + 1, 3)
+    }
+
+    const result = []
+    for (let sequence = 1; sequence < reject.sequence; sequence++) {
+      const passed = latestPassed(currentAudits, sequence)
+      if (passed) {
+        result.push(passed)
+      }
+    }
+    result.push(reject)
+    return result
+  }
+
+  const currentAudits = currentAttemptAudits(audits)
+
+  if (status === '待审核') {
+    return [pendingAudit(1, currentTask)]
+  }
+
+  if (status === '待二次审核') {
+    return [latestPassed(currentAudits, 1), pendingAudit(2, currentTask)].filter(Boolean)
+  }
+
+  if (status === '待三次审核') {
+    return [
+      latestPassed(currentAudits, 1),
+      latestPassed(currentAudits, 2),
+      pendingAudit(3, currentTask)
+    ].filter(Boolean)
+  }
+
+  if (status === '审核通过' || status === '已报销') {
+    return [1, 2, 3]
+        .map(sequence => latestPassed(currentAudits, sequence))
+        .filter(Boolean)
+  }
+
+  return []
+}
+
 const viewDetail = async (row) => {
   currentApply.value = row
   detailVisible.value = true
 
-  // 待提交和待审核状态不显示任何审核流程
-  if (row.status === '待提交' || row.status === '待审核') {
-    auditList.value = []
-    return
-  }
-
-  const res = await request.get(`/approve/selectByApply_ID/${row.apply_ID}`)
-  if (res.code === '200') {
-    let allAudits = res.data || []
-
-    // 1. 按 sequence 分组，每组只取最新的（approve_time 最大的）
-    const latestAuditsMap = new Map()
-
-    allAudits.forEach(audit => {
-      if (!audit.approve_time) return
-      const sequence = audit.sequence
-      const existing = latestAuditsMap.get(sequence)
-      if (!existing || audit.approve_time > existing.approve_time) {
-        latestAuditsMap.set(sequence, audit)
-      }
-    })
-
-    // 2. 转换为数组并按 sequence 排序
-    let latestAudits = Array.from(latestAuditsMap.values())
-    latestAudits.sort((a, b) => a.sequence - b.sequence)
-
-    // 3. 根据当前状态过滤显示
-    let filteredAudits = []
-    let maxSequence = 0
-
-    switch (row.status) {
-      case '待二次审核':
-        maxSequence = 1
-        break
-      case '待三次审核':
-        maxSequence = 2
-        break
-      case '审核通过':
-      case '已报销':
-      case '审核驳回':
-        maxSequence = 99
-        break
-      default:
-        maxSequence = 99
-    }
-
-    // 4. 按顺序添加，如果遇到不通过的审核则停止
-    for (let i = 0; i < latestAudits.length && latestAudits[i].sequence <= maxSequence; i++) {
-      const audit = latestAudits[i]
-      filteredAudits.push(audit)
-      if (audit.status !== '审核通过') {
-        break
-      }
-    }
-
-    auditList.value = filteredAudits
+  const [approveRes, taskRes] = await Promise.all([
+    request.get(`/approve/selectByApply_ID/${row.apply_ID}`),
+    request.get(`/workflow/currentTask/${row.apply_ID}`).catch(() => ({ data: null }))
+  ])
+  if (approveRes.code === '200') {
+    auditList.value = buildAuditTimeline(row.status, approveRes.data || [], taskRes.data)
   }
 }
 

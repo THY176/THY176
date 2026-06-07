@@ -82,11 +82,24 @@ public class ApplyService {
         approve.setTeacher_ID(adminId);
         approve.setTeacher_name(adminName);
         approve.setRole("管理员强制驳回");
-        approve.setSequence(99);
+        approve.setSequence(getForceRejectSequence(existing.getStatus()));
         approve.setOpinion((opinion == null || opinion.isBlank()) ? "管理员强制驳回" : opinion);
         approve.setStatus("审核驳回");
         approve.setApprove_time(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         approveMapper.insert(approve);
+    }
+
+    private Integer getForceRejectSequence(String status) {
+        if ("待审核".equals(status)) {
+            return 1;
+        }
+        if ("待二次审核".equals(status)) {
+            return 2;
+        }
+        if ("待三次审核".equals(status) || "审核通过".equals(status) || "已报销".equals(status)) {
+            return 3;
+        }
+        return 99;
     }
 
     private void validateStatusUpdate(Apply apply) {

@@ -1,14 +1,17 @@
 package com.example.service;
 
 import com.example.entity.Apply;
+import com.example.entity.Admin;
 import com.example.entity.Approve;
 import com.example.entity.Reimburse;
 import com.example.entity.Team;
+import com.example.entity.Teacher;
 import com.example.mapper.AdminMapper;
 import com.example.mapper.ApplyMapper;
 import com.example.mapper.ApproveMapper;
 import com.example.mapper.ReimburseMapper;
 import com.example.mapper.TeamMapper;
+import com.example.mapper.TeacherMapper;
 import org.flowable.engine.*;
 import org.flowable.engine.runtime.ProcessInstance;
 import org.flowable.task.api.Task;
@@ -48,6 +51,9 @@ public class WorkflowService {
 
     @Autowired
     private AdminMapper adminMapper;  // 添加这行
+
+    @Autowired
+    private TeacherMapper teacherMapper;
 
     /**
      * 获取当前待办量最少的管理员ID（排除指定的管理员）。
@@ -503,6 +509,71 @@ public class WorkflowService {
                 return "待报销";
             default:
                 return task.getName();
+        }
+    }
+
+    /**
+     * 获取申请当前待处理任务及已分配审批人。
+     */
+    public Map<String, Object> getCurrentTaskInfo(Integer applyId) {
+        Apply apply = applyMapper.selectByapply_ID(applyId);
+        if (apply == null || apply.getProcessInstanceId() == null || apply.getProcessInstanceId().isBlank()) {
+            return null;
+        }
+
+        Task task = taskService.createTaskQuery()
+                .processInstanceId(apply.getProcessInstanceId())
+                .active()
+                .singleResult();
+        if (task == null) {
+            return null;
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("taskId", task.getId());
+        result.put("taskName", task.getName());
+        result.put("taskDefinitionKey", task.getTaskDefinitionKey());
+        result.put("assigneeId", task.getAssignee());
+        result.put("assigneeName", getTaskAssigneeName(task));
+        result.put("sequence", getAuditSequence(task.getTaskDefinitionKey()));
+        return result;
+    }
+
+    private String getTaskAssigneeName(Task task) {
+        if (task == null || task.getAssignee() == null || task.getAssignee().isBlank()) {
+            return null;
+        }
+
+        Integer assigneeId;
+        try {
+            assigneeId = Integer.valueOf(task.getAssignee());
+        } catch (NumberFormatException e) {
+            return task.getAssignee();
+        }
+
+        if ("firstAudit".equals(task.getTaskDefinitionKey())) {
+            Teacher teacher = teacherMapper.selectByteacher_ID(assigneeId);
+            return teacher != null ? teacher.getName() : task.getAssignee();
+        }
+
+        if ("secondAudit".equals(task.getTaskDefinitionKey()) || "thirdAudit".equals(task.getTaskDefinitionKey())) {
+            Admin admin = adminMapper.selectByteacher_ID(assigneeId);
+            return admin != null ? admin.getName() : task.getAssignee();
+        }
+
+        return task.getAssignee();
+    }
+
+    private Integer getAuditSequence(String taskDefinitionKey) {
+        switch (taskDefinitionKey) {
+            case "firstAudit":
+                return 1;
+            case "secondAudit":
+                return 2;
+            case "thirdAudit":
+                return 3;
+            default:
+                return null;
         }
     }
 
