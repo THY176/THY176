@@ -45,7 +45,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onActivated, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user.js'
 import request from '@/utils/request.js'
@@ -63,8 +63,18 @@ const stats = reactive({
   reimbursedMoney: 0
 })
 
-// 定义审核通过的状态（包含所有已提交且未被驳回的状态）
-const approvedStatuses = ['待审核', '待二次审核', '待三次审核', '审核通过', '已报销']
+const effectiveStatuses = ['待审核', '待二次审核', '待三次审核', '审核通过', '已报销']
+const moneyValue = (value) => parseFloat(value || 0)
+
+const latestReimburse = (reimburses) => {
+  return (reimburses || [])
+      .filter(item => item.status === '已报销')
+      .sort((a, b) => {
+        const timeCompare = (b.time || '').localeCompare(a.time || '')
+        if (timeCompare !== 0) return timeCompare
+        return (b.reimburse_ID || 0) - (a.reimburse_ID || 0)
+      })[0] || null
+}
 
 const loadStats = async () => {
   // 检查登录状态
@@ -80,33 +90,30 @@ const loadStats = async () => {
     if (res.code !== '200') return
 
     const list = res.data || []
-    const applyIds = list.map(a => a.apply_ID)
-
     // 总申请次数：所有申请
     stats.totalApply = list.length
 
-    // 总申请金额：只统计审核通过的申请（排除审核驳回和待提交）
-    const approvedList = list.filter(item => approvedStatuses.includes(item.status))
-    stats.totalMoney = approvedList.reduce((sum, item) => sum + parseFloat(item.apply_money || 0), 0).toFixed(2)
+    // 总申请金额：只统计当前仍在有效流程或已完成的申请，排除待提交和审核驳回。
+    const approvedList = list.filter(item => effectiveStatuses.includes(item.status))
+    stats.totalMoney = approvedList.reduce((sum, item) => sum + moneyValue(item.apply_money), 0).toFixed(2)
 
-    // 获取报销记录 - 从申请表中直接统计已报销状态的申请金额
-    // 这样删除报销记录时，申请状态还是"已报销"，金额不会丢失
-    // 如果你希望删除报销记录后金额减少，需要同时将申请状态改回"审核通过"
-
-    // 方案1：从申请表中统计已报销金额（推荐）
+    // 已报销金额：只统计当前仍为已报销申请的最新实际报销记录，避免旧记录继续累加。
     const reimbursedList = list.filter(item => item.status === '已报销')
-    stats.reimbursedMoney = reimbursedList.reduce((sum, item) => sum + parseFloat(item.apply_money || 0), 0).toFixed(2)
-
-    // 方案2：从报销表中统计（如果报销记录被删除，金额会减少）
-    // const reimburseRes = await request.get('/reimburse/selectAll')
-    // const relatedReimburses = (reimburseRes.data || []).filter(r => applyIds.includes(r.apply_ID) && r.status === '已报销')
-    // stats.reimbursedMoney = relatedReimburses.reduce((sum, item) => sum + parseFloat(item.money || 0), 0).toFixed(2)
+    const reimburseRecords = await Promise.all(
+        reimbursedList.map(async item => {
+          const reimburseRes = await request.get(`/reimburse/selectByApply_ID/${item.apply_ID}`)
+          return reimburseRes.code === '200' ? latestReimburse(reimburseRes.data || []) : null
+        })
+    )
+    stats.reimbursedMoney = reimburseRecords
+        .reduce((sum, item) => sum + moneyValue(item?.money), 0)
+        .toFixed(2)
 
     // 经费类型分布（饼图）- 只统计审核通过的申请
     const typeMap = {}
     approvedList.forEach(item => {
       if (item.apply_type) {
-        typeMap[item.apply_type] = (typeMap[item.apply_type] || 0) + parseFloat(item.apply_money || 0)
+        typeMap[item.apply_type] = (typeMap[item.apply_type] || 0) + moneyValue(item.apply_money)
       }
     })
 
@@ -126,7 +133,7 @@ const loadStats = async () => {
     approvedList.forEach(item => {
       if (item.apply_time) {
         const month = item.apply_time.slice(0, 7)
-        monthMap[month] = (monthMap[month] || 0) + parseFloat(item.apply_money || 0)
+        monthMap[month] = (monthMap[month] || 0) + moneyValue(item.apply_money)
       }
     })
     const sortedMonths = Object.keys(monthMap).sort()
@@ -146,10 +153,10 @@ const loadStats = async () => {
 
     // 渲染图表
     if (pieChart.value) {
-      echarts.init(pieChart.value).setOption(pieOption)
+      echarts.init(pieChart.value).setOption(pieOption, true)
     }
     if (lineChart.value) {
-      echarts.init(lineChart.value).setOption(lineOption)
+      echarts.init(lineChart.value).setOption(lineOption, true)
     }
   } catch (error) {
     console.error('加载统计数据失败:', error)
@@ -169,6 +176,10 @@ onMounted(() => {
   window.addEventListener('member-deleted', handleDataRefresh)
   window.addEventListener('apply-updated', handleDataRefresh)
   window.addEventListener('reimburse-changed', handleDataRefresh)
+})
+
+onActivated(() => {
+  loadStats()
 })
 
 // 组件卸载时移除事件监听

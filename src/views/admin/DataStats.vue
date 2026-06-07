@@ -64,7 +64,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onActivated, onMounted } from 'vue'
 import request from '@/utils/request.js'
 import * as echarts from 'echarts'
 
@@ -80,6 +80,24 @@ const globalStats = reactive({
   reimbursedMoney: 0       // 已报销金额
 })
 
+const approvedStatuses = ['审核通过', '已报销']
+const moneyValue = (value) => parseFloat(value || 0)
+
+const latestReimburseMap = (reimburses) => {
+  const map = new Map()
+  reimburses
+      .filter(item => item.status === '已报销' && item.apply_ID)
+      .forEach(item => {
+        const existing = map.get(item.apply_ID)
+        const currentKey = `${item.time || ''}_${item.reimburse_ID || 0}`
+        const existingKey = existing ? `${existing.time || ''}_${existing.reimburse_ID || 0}` : ''
+        if (!existing || currentKey > existingKey) {
+          map.set(item.apply_ID, item)
+        }
+      })
+  return map
+}
+
 const loadStats = async () => {
   // 获取所有社团
   const clubRes = await request.get('/team/selectAll')
@@ -91,37 +109,28 @@ const loadStats = async () => {
   const applies = applyRes.code === '200' ? (applyRes.data || []) : []
   globalStats.totalApplies = applies.length
 
-  // 统计通过数和通过金额（状态为"审核通过"或"已报销"）
-  let approvedCount = 0
-  let approvedMoney = 0
-  applies.forEach(a => {
-    if (a.status === '审核通过' || a.status === '已报销') {
-      approvedCount++
-      approvedMoney += parseFloat(a.apply_money || 0)
-    }
-  })
-  globalStats.approvedCount = approvedCount
-  globalStats.approvedMoney = approvedMoney.toFixed(2)
+  const approvedApplies = applies.filter(a => approvedStatuses.includes(a.status))
+  const reimbursedApplies = applies.filter(a => a.status === '已报销')
 
-  // 获取所有报销记录，计算已报销金额
+  globalStats.approvedCount = approvedApplies.length
+  globalStats.approvedMoney = approvedApplies
+      .reduce((sum, item) => sum + moneyValue(item.apply_money), 0)
+      .toFixed(2)
+
+  // 只统计当前仍为已报销申请的最新报销记录，避免旧流程报销记录继续累加。
   const reRes = await request.get('/reimburse/selectAll')
   const reimburses = reRes.code === '200' ? (reRes.data || []) : []
-  let reimbursedMoney = 0
-  reimburses.forEach(r => {
-    if (r.status === '已报销') {
-      reimbursedMoney += parseFloat(r.money || 0)
-    }
-  })
-  globalStats.reimbursedMoney = reimbursedMoney.toFixed(2)
+  const reimburseMap = latestReimburseMap(reimburses)
+  globalStats.reimbursedMoney = reimbursedApplies
+      .reduce((sum, item) => sum + moneyValue(reimburseMap.get(item.apply_ID)?.money), 0)
+      .toFixed(2)
 
   // 柱状图：各社团申请金额对比（只统计审核通过和已报销的金额）
   const clubMoneyMap = {}
   clubs.forEach(c => clubMoneyMap[c.team_name] = 0)
-  applies.forEach(a => {
-    if (a.status === '审核通过' || a.status === '已报销') {
-      const club = clubs.find(c => c.team_ID === a.team_ID)
-      if (club) clubMoneyMap[club.team_name] += parseFloat(a.apply_money || 0)
-    }
+  approvedApplies.forEach(a => {
+    const club = clubs.find(c => c.team_ID === a.team_ID)
+    if (club) clubMoneyMap[club.team_name] += moneyValue(a.apply_money)
   })
 
   if (barChart.value) {
@@ -130,7 +139,7 @@ const loadStats = async () => {
       xAxis: { type: 'category', data: Object.keys(clubMoneyMap), axisLabel: { rotate: 45, interval: 0 } },
       yAxis: { type: 'value', name: '金额(元)' },
       series: [{ data: Object.values(clubMoneyMap), type: 'bar', itemStyle: { color: '#409eff' } }]
-    })
+    }, true)
   }
 
   // 饼图：审核状态分布
@@ -146,15 +155,15 @@ const loadStats = async () => {
         radius: ['40%', '70%'],
         data: Object.entries(statusMap).map(([name, value]) => ({ name, value }))
       }]
-    })
+    }, true)
   }
 
   // 折线图：月度趋势（只统计审核通过和已报销的金额）
   const monthMap = {}
-  applies.forEach(a => {
-    if ((a.status === '审核通过' || a.status === '已报销') && a.apply_time) {
+  approvedApplies.forEach(a => {
+    if (a.apply_time) {
       const month = a.apply_time.slice(0, 7)
-      monthMap[month] = (monthMap[month] || 0) + parseFloat(a.apply_money || 0)
+      monthMap[month] = (monthMap[month] || 0) + moneyValue(a.apply_money)
     }
   })
   const sortedMonths = Object.keys(monthMap).sort()
@@ -167,15 +176,19 @@ const loadStats = async () => {
       series: [{
         data: sortedMonths.map(m => monthMap[m]),
         type: 'line',
-        smooth: true,
-        areaStyle: { color: 'rgba(103, 194, 58, 0.2)' },
-        itemStyle: { color: '#67c23a' }
-      }]
-    })
+      smooth: true,
+      areaStyle: { color: 'rgba(103, 194, 58, 0.2)' },
+      itemStyle: { color: '#67c23a' }
+    }]
+    }, true)
   }
 }
 
 onMounted(() => {
+  loadStats()
+})
+
+onActivated(() => {
   loadStats()
 })
 </script>
