@@ -5,6 +5,7 @@ import com.example.mapper.ApplyMapper;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.PageInfo;
 import jakarta.annotation.Resource;
+import org.flowable.engine.RuntimeService;
 import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
@@ -16,6 +17,9 @@ public class ApplyService {
 
     @Resource
     private ApplyMapper applyMapper;
+
+    @Resource
+    private RuntimeService runtimeService;
 
     public List<Apply> selectAll(Apply apply) {
         return applyMapper.selectAll(apply);
@@ -39,7 +43,51 @@ public class ApplyService {
         System.out.println("=== ApplyService.update ===");
         System.out.println("apply_ID: " + apply.getApply_ID());
         System.out.println("processInstanceId: " + apply.getProcessInstanceId());
+        validateStatusUpdate(apply);
         applyMapper.updateByapply_ID(apply);
+    }
+
+    public void forceStatus(Integer applyId, String status) {
+        Apply existing = applyMapper.selectByapply_ID(applyId);
+        if (existing == null) {
+            throw new RuntimeException("申请不存在");
+        }
+        if (hasActiveProcess(existing)) {
+            throw new RuntimeException("该申请仍有进行中的工作流任务，不能强制修改状态");
+        }
+
+        Apply updateApply = new Apply();
+        updateApply.setApply_ID(applyId);
+        updateApply.setStatus(status);
+        applyMapper.updateByapply_ID(updateApply);
+    }
+
+    private void validateStatusUpdate(Apply apply) {
+        if (apply == null || apply.getApply_ID() == null || apply.getStatus() == null) {
+            return;
+        }
+
+        Apply existing = applyMapper.selectByapply_ID(apply.getApply_ID());
+        if (existing == null || !hasActiveProcess(existing)) {
+            return;
+        }
+
+        String oldStatus = existing.getStatus();
+        String newStatus = apply.getStatus();
+        if (oldStatus != null && !oldStatus.equals(newStatus)) {
+            throw new RuntimeException("申请存在进行中的工作流任务，状态变更必须通过工作流接口完成");
+        }
+    }
+
+    private boolean hasActiveProcess(Apply apply) {
+        String processInstanceId = apply.getProcessInstanceId();
+        if (processInstanceId == null || processInstanceId.isBlank()) {
+            return false;
+        }
+        return runtimeService.createProcessInstanceQuery()
+                .processInstanceId(processInstanceId)
+                .active()
+                .count() > 0;
     }
 
     public void delByapply_ID(Integer apply_ID) {

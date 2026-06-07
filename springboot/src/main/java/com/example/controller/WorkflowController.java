@@ -43,6 +43,15 @@ public class WorkflowController {
     }
 
     /**
+     * 获取待报销工作流任务
+     */
+    @GetMapping("/reimburse/tasks")
+    public Result getReimburseTasks() {
+        List<Map<String, Object>> tasks = workflowService.getReimbursePendingTasks();
+        return Result.success(tasks);
+    }
+
+    /**
      * 一级审核（指导老师）
      */
     @PostMapping("/firstAudit")

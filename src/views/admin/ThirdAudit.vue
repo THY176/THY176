@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div>
     <el-card>
       <template #header>
@@ -76,7 +76,6 @@ const pageNum = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
 const tableData = ref([])
-const clubList = ref([])
 
 const columns = [
   { prop: 'apply_ID', label: '申请编号', width: 100 },
@@ -90,6 +89,7 @@ const columns = [
 const auditVisible = ref(false)
 const detailVisible = ref(false)
 const currentApply = ref(null)
+const currentTask = ref(null)
 const firstAudit = ref(null)
 const secondAudit = ref(null)
 
@@ -103,26 +103,23 @@ const auditRules = {
   opinion: [{ required: true, message: '请输入意见', trigger: 'blur' }]
 }
 
-const loadClubs = async () => {
-  const res = await request.get('/team/selectAll')
-  if (res.code === '200') {
-    clubList.value = res.data || []
-  }
-}
-
 const load = async () => {
   if (!userStore.userId) return
 
   try {
-    const res = await request.get('/apply/selectByStatus/待三次审核')
+    const res = await request.get(`/workflow/admin/tasks/${userStore.userId}`)
     if (res.code === '200') {
-      let list = res.data || []
-      for (let item of list) {
-        const club = clubList.value.find(c => c.team_ID === item.team_ID)
-        item.team_name = club?.team_name || '未知社团'
-      }
-      tableData.value = list
-      total.value = list.length
+      let tasks = res.data || []
+      tasks = tasks.filter(task => task.taskDefinitionKey === 'thirdAudit' && task.apply)
+
+      tableData.value = tasks.map(task => ({
+        ...task.apply,
+        taskId: task.taskId,
+        taskName: task.taskName,
+        taskDefinitionKey: task.taskDefinitionKey,
+        team_name: task.teamName || task.team_name || '未知社团'
+      }))
+      total.value = tableData.value.length
     }
   } catch (error) {
     console.error('加载待审核列表失败:', error)
@@ -131,6 +128,7 @@ const load = async () => {
 
 const openAuditDialog = async (row) => {
   currentApply.value = row
+  currentTask.value = row
   auditForm.result = '审核通过'
   auditForm.opinion = ''
 
@@ -169,32 +167,24 @@ const handleAudit = async () => {
   const approved = auditForm.result === '审核通过'
 
   try {
-    const newStatus = approved ? '审核通过' : '审核驳回'
-
-    const approveRes = await request.post('/approve/add', {
-      apply_ID: currentApply.value.apply_ID,
-      teacher_ID: userStore.userId,
-      teacher_name: adminName,
-      role: '管理员',
-      sequence: 3,
-      opinion: auditForm.opinion,
-      status: auditForm.result,
-      approve_time: new Date().toISOString().slice(0, 19).replace('T', ' ')
+    const res = await request.post('/workflow/thirdAudit', null, {
+      params: {
+        taskId: currentTask.value.taskId,
+        applyId: currentApply.value.apply_ID,
+        adminId: userStore.userId,
+        adminName: adminName,
+        opinion: auditForm.opinion,
+        approved: approved
+      }
     })
 
-    if (approveRes.code !== '200') {
-      ElMessage.error('审核记录保存失败')
-      return
+    if (res.code === '200') {
+      ElMessage.success('审核完成：' + auditForm.result)
+      auditVisible.value = false
+      load()
+    } else {
+      ElMessage.error(res.msg || '审核失败')
     }
-
-    await request.put('/apply/update', {
-      apply_ID: currentApply.value.apply_ID,
-      status: newStatus
-    })
-
-    ElMessage.success('审核完成：' + auditForm.result)
-    auditVisible.value = false
-    load()
   } catch (error) {
     console.error('审核失败:', error)
     ElMessage.error('审核失败')
@@ -202,7 +192,7 @@ const handleAudit = async () => {
 }
 
 onMounted(() => {
-  loadClubs().then(() => load())
+  load()
 })
 </script>
 

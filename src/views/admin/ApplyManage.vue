@@ -267,9 +267,11 @@ const forceStatus = (row) => {
 }
 
 const confirmStatusChange = () => {
-  request.put('/apply/update', {
-    apply_ID: currentApply.value.apply_ID,
-    status: newStatus.value
+  request.post('/apply/forceStatus', null, {
+    params: {
+      applyId: currentApply.value.apply_ID,
+      status: newStatus.value
+    }
   }).then(res => {
     if (res.code === '200') {
       ElMessage.success('状态修改成功')
@@ -280,7 +282,7 @@ const confirmStatusChange = () => {
     }
   }).catch(err => {
     console.error('修改失败:', err)
-    ElMessage.error('修改失败')
+    ElMessage.error(err.message || '修改失败')
   })
 }
 

@@ -2,10 +2,12 @@ package com.example.service;
 
 import com.example.entity.Apply;
 import com.example.entity.Approve;
+import com.example.entity.Reimburse;
 import com.example.entity.Team;
 import com.example.mapper.AdminMapper;
 import com.example.mapper.ApplyMapper;
 import com.example.mapper.ApproveMapper;
+import com.example.mapper.ReimburseMapper;
 import com.example.mapper.TeamMapper;
 import org.flowable.engine.*;
 import org.flowable.engine.runtime.ProcessInstance;
@@ -42,12 +44,15 @@ public class WorkflowService {
     private ApproveMapper approveMapper;
 
     @Autowired
+    private ReimburseMapper reimburseMapper;
+
+    @Autowired
     private AdminMapper adminMapper;  // 添加这行
 
     /**
-     * 随机获取一个管理员ID（排除指定的管理员）
+     * 获取当前待办量最少的管理员ID（排除指定的管理员）。
      */
-    private Integer getRandomAdmin(Integer excludeId) {
+    private Integer getLeastBusyAdmin(Integer excludeId) {
         List<Integer> adminIds = adminMapper.getAllAdminIds();
         if (adminIds == null || adminIds.isEmpty()) {
             throw new RuntimeException("没有可用的管理员");
@@ -65,8 +70,82 @@ public class WorkflowService {
             throw new RuntimeException("没有其他可用的管理员");
         }
 
-        Random random = new Random();
-        return availableAdmins.get(random.nextInt(availableAdmins.size()));
+        return availableAdmins.stream()
+                .min(Comparator
+                        .comparingLong((Integer id) -> taskService.createTaskQuery()
+                                .taskAssignee(String.valueOf(id))
+                                .active()
+                                .count())
+                        .thenComparing(Integer::intValue))
+                .orElseThrow(() -> new RuntimeException("没有可用的管理员"));
+    }
+
+    private void validateAuditTask(Task task, String expectedTaskDefinitionKey, Integer expectedAssigneeId, Integer applyId) {
+        if (task == null) {
+            throw new RuntimeException("任务不存在");
+        }
+        if (!expectedTaskDefinitionKey.equals(task.getTaskDefinitionKey())) {
+            throw new RuntimeException("任务节点不匹配");
+        }
+        String expectedAssignee = String.valueOf(expectedAssigneeId);
+        if (!expectedAssignee.equals(task.getAssignee())) {
+            throw new RuntimeException("当前用户不是该任务的审批人");
+        }
+        Object taskApplyId = runtimeService.getVariable(task.getProcessInstanceId(), "applyId");
+        if (taskApplyId == null || !String.valueOf(applyId).equals(String.valueOf(taskApplyId))) {
+            throw new RuntimeException("任务与申请单不匹配");
+        }
+        validateTaskMatchesBusinessStatus(task, applyId);
+    }
+
+    private void validateWorkflowTask(Task task, String expectedTaskDefinitionKey, Integer applyId) {
+        if (task == null) {
+            throw new RuntimeException("任务不存在");
+        }
+        if (!expectedTaskDefinitionKey.equals(task.getTaskDefinitionKey())) {
+            throw new RuntimeException("任务节点不匹配");
+        }
+        Object taskApplyId = runtimeService.getVariable(task.getProcessInstanceId(), "applyId");
+        if (taskApplyId == null || !String.valueOf(applyId).equals(String.valueOf(taskApplyId))) {
+            throw new RuntimeException("任务与申请单不匹配");
+        }
+        validateTaskMatchesBusinessStatus(task, applyId);
+    }
+
+    private void validateTaskMatchesBusinessStatus(Task task, Integer applyId) {
+        Apply apply = applyMapper.selectByapply_ID(applyId);
+        if (apply == null) {
+            throw new RuntimeException("申请不存在");
+        }
+        if (!isTaskConsistentWithApplyStatus(task, apply)) {
+            throw new RuntimeException("申请状态与当前工作流任务不一致，请先处理流程数据");
+        }
+    }
+
+    private boolean isTaskConsistentWithApplyStatus(Task task, Apply apply) {
+        if (task == null || apply == null) {
+            return false;
+        }
+
+        String expectedStatus = getExpectedStatus(task.getTaskDefinitionKey());
+        return expectedStatus == null || expectedStatus.equals(apply.getStatus());
+    }
+
+    private String getExpectedStatus(String taskDefinitionKey) {
+        switch (taskDefinitionKey) {
+            case "submitApply":
+                return "审核驳回";
+            case "firstAudit":
+                return "待审核";
+            case "secondAudit":
+                return "待二次审核";
+            case "thirdAudit":
+                return "待三次审核";
+            case "reimburse":
+                return "审核通过";
+            default:
+                return null;
+        }
     }
 
     /**
@@ -110,9 +189,7 @@ public class WorkflowService {
     public void firstAudit(String taskId, Integer applyId, Integer teacherId,
                            String teacherName, String opinion, boolean approved) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (task == null) {
-            throw new RuntimeException("任务不存在");
-        }
+        validateAuditTask(task, "firstAudit", teacherId, applyId);
 
         // 1. 保存审核记录
         Approve approve = new Approve();
@@ -139,8 +216,8 @@ public class WorkflowService {
         variables.put("firstOpinion", opinion);
 
         if (approved) {
-            // 随机选择一个管理员作为二级审核人
-            Integer nextAssignee = getRandomAdmin(null);
+            // 选择当前待办量最少的管理员作为二级审核人
+            Integer nextAssignee = getLeastBusyAdmin(null);
             variables.put("secondAuditAssignee", String.valueOf(nextAssignee));
         }
         taskService.complete(taskId, variables);
@@ -153,9 +230,7 @@ public class WorkflowService {
     public void secondAudit(String taskId, Integer applyId, Integer adminId,
                             String adminName, String opinion, boolean approved) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (task == null) {
-            throw new RuntimeException("任务不存在");
-        }
+        validateAuditTask(task, "secondAudit", adminId, applyId);
 
         // 1. 保存审核记录
         Approve approve = new Approve();
@@ -182,8 +257,8 @@ public class WorkflowService {
         variables.put("secondOpinion", opinion);
 
         if (approved) {
-            // 随机选择一个管理员作为三级审核人（排除当前管理员）
-            Integer nextAssignee = getRandomAdmin(adminId);
+            // 选择当前待办量最少的管理员作为三级审核人（排除当前管理员）
+            Integer nextAssignee = getLeastBusyAdmin(adminId);
             variables.put("thirdAuditAssignee", String.valueOf(nextAssignee));
         }
         taskService.complete(taskId, variables);
@@ -196,9 +271,7 @@ public class WorkflowService {
     public void thirdAudit(String taskId, Integer applyId, Integer adminId,
                            String adminName, String opinion, boolean approved) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (task == null) {
-            throw new RuntimeException("任务不存在");
-        }
+        validateAuditTask(task, "thirdAudit", adminId, applyId);
 
         // 1. 保存审核记录
         Approve approve = new Approve();
@@ -254,6 +327,9 @@ public class WorkflowService {
             // 获取完整的申请信息
             if (applyId != null) {
                 Apply apply = applyMapper.selectByapply_ID(applyId);
+                if (!isTaskConsistentWithApplyStatus(task, apply)) {
+                    continue;
+                }
                 taskInfo.put("apply", apply);
 
                 // 获取社团名称
@@ -294,6 +370,9 @@ public class WorkflowService {
 
             if (applyId != null) {
                 Apply apply = applyMapper.selectByapply_ID(applyId);
+                if (!isTaskConsistentWithApplyStatus(task, apply)) {
+                    continue;
+                }
                 taskInfo.put("apply", apply);
                 if (apply != null && apply.getTeam_ID() != null) {
                     Team team = teamMapper.selectByteam_ID(apply.getTeam_ID());
@@ -304,6 +383,41 @@ public class WorkflowService {
             result.add(taskInfo);
         }
         return result;
+    }
+
+    /**
+     * 获取待报销工作流任务。
+     */
+    public List<Map<String, Object>> getReimbursePendingTasks() {
+        List<Task> tasks = taskService.createTaskQuery()
+                .taskDefinitionKey("reimburse")
+                .active()
+                .orderByTaskCreateTime().desc()
+                .list();
+
+        return buildTaskResult(tasks);
+    }
+
+    /**
+     * 社团修改被驳回申请后重新提交，完成退回到社团的 submitApply 任务。
+     */
+    @Transactional
+    public void resubmitApply(Integer applyId, Integer teamId) {
+        Apply apply = applyMapper.selectByapply_ID(applyId);
+        if (apply == null || apply.getProcessInstanceId() == null) {
+            throw new RuntimeException("申请未关联工作流");
+        }
+
+        Task task = taskService.createTaskQuery()
+                .processInstanceId(apply.getProcessInstanceId())
+                .taskDefinitionKey("submitApply")
+                .taskAssignee(String.valueOf(teamId))
+                .singleResult();
+        validateWorkflowTask(task, "submitApply", applyId);
+
+        apply.setStatus("待审核");
+        applyMapper.updateByapply_ID(apply);
+        taskService.complete(task.getId());
     }
 
     /**
@@ -325,6 +439,9 @@ public class WorkflowService {
             // 获取完整的申请信息
             if (applyId != null) {
                 Apply apply = applyMapper.selectByapply_ID(applyId);
+                if (!isTaskConsistentWithApplyStatus(task, apply)) {
+                    continue;
+                }
                 taskInfo.put("apply", apply);
 
                 // 获取社团名称
@@ -379,9 +496,15 @@ public class WorkflowService {
     public void executeReimburse(String taskId, Integer applyId, Integer financeId,
                                  String financeName, String reimburseAmount) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
-        if (task == null) {
-            throw new RuntimeException("任务不存在");
-        }
+        validateWorkflowTask(task, "reimburse", applyId);
+
+        Reimburse reimburse = new Reimburse();
+        reimburse.setApply_ID(applyId);
+        reimburse.setTeacher_ID(financeId);
+        reimburse.setMoney(reimburseAmount);
+        reimburse.setTime(getCurrentTime());
+        reimburse.setStatus("已报销");
+        reimburseMapper.insert(reimburse);
 
         Apply apply = applyMapper.selectByapply_ID(applyId);
         if (apply != null) {

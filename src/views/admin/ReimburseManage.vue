@@ -135,10 +135,20 @@ const getTeamName = (teamId) => {
 
 const load = async () => {
   const status = searchForm.status || '审核通过'
-  const res = await request.get(`/apply/selectByStatus/${status}`)
+  const res = status === '审核通过'
+      ? await request.get('/workflow/reimburse/tasks')
+      : await request.get(`/apply/selectByStatus/${status}`)
   if (res.code !== '200') return
 
-  const list = res.data || []
+  const list = status === '审核通过'
+      ? (res.data || []).filter(task => task.apply).map(task => ({
+        ...task.apply,
+        taskId: task.taskId,
+        taskName: task.taskName,
+        taskDefinitionKey: task.taskDefinitionKey,
+        team_name: task.teamName || task.team_name || getTeamName(task.apply.team_ID)
+      }))
+      : (res.data || [])
 
   // 补充社团名称
   for (let item of list) {
@@ -199,33 +209,26 @@ const handleReimburse = async () => {
   if (!currentApply.value) return
 
   try {
-    // 1. 创建报销记录
-    const reimburseRes = await request.post('/reimburse/add', {
-      apply_ID: currentApply.value.apply_ID,
-      teacher_ID: userStore.userId,
-      money: reimburseForm.money,
-      time: new Date().toISOString().slice(0, 19).replace('T', ' '),
-      status: '已报销',
-      remark: reimburseForm.remark
+    const res = await request.post('/workflow/reimburse', null, {
+      params: {
+        taskId: currentApply.value.taskId,
+        applyId: currentApply.value.apply_ID,
+        financeId: userStore.userId,
+        financeName: userStore.userInfo?.name || '管理员',
+        reimburseAmount: reimburseForm.money
+      }
     })
 
-    if (reimburseRes.code !== '200') {
-      ElMessage.error('报销记录创建失败')
-      return
+    if (res.code === '200') {
+      ElMessage.success('报销执行成功')
+      reimburseVisible.value = false
+      load()
+    } else {
+      ElMessage.error(res.msg || '报销失败')
     }
-
-    // 2. 更新申请表状态为已报销
-    await request.put('/apply/update', {
-      apply_ID: currentApply.value.apply_ID,
-      status: '已报销'
-    })
-
-    ElMessage.success('报销执行成功')
-    reimburseVisible.value = false
-    load()
   } catch (error) {
     console.error('报销失败:', error)
-    ElMessage.error('报销失败')
+    ElMessage.error(error.message || '报销失败')
   }
 }
 

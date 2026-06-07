@@ -9,6 +9,7 @@ import com.example.service.WorkflowService;
 import com.github.pagehelper.PageInfo;
 import jakarta.annotation.Resource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.SimpleDateFormat;
@@ -56,8 +57,22 @@ public class ApplyController {
 
     @PutMapping("/update")
     public Result update(@RequestBody Apply apply) {
-        applyService.update(apply);
-        return Result.success();
+        try {
+            applyService.update(apply);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/forceStatus")
+    public Result forceStatus(@RequestParam Integer applyId, @RequestParam String status) {
+        try {
+            applyService.forceStatus(applyId, status);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     @DeleteMapping("/delByapply_ID/{apply_ID}")
@@ -198,5 +213,25 @@ public class ApplyController {
         }
     }
 
+    @PostMapping("/resubmit")
+    @Transactional
+    public Result resubmit(@RequestBody Apply apply) {
+        try {
+            Apply existing = applyService.selectByapply_ID(apply.getApply_ID());
+            if (existing == null) {
+                return Result.error("申请不存在");
+            }
+
+            apply.setStatus(null);
+            apply.setProcessInstanceId(null);
+            applyService.update(apply);
+            workflowService.resubmitApply(apply.getApply_ID(), existing.getTeam_ID());
+
+            return Result.success();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("重新提交失败: " + e.getMessage());
+        }
+    }
 
 }

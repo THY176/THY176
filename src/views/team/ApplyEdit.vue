@@ -145,7 +145,8 @@ const formData = reactive({
   bank: '',
   account: '',
   status: '',
-  tags: ''
+  tags: '',
+  processInstanceId: ''
 })
 
 const rules = {
@@ -184,7 +185,8 @@ onMounted(() => {
         bank: data.bank,
         account: data.account,
         status: data.status,
-        tags: data.tags || ''
+        tags: data.tags || '',
+        processInstanceId: data.processInstanceId || ''
       })
 
       console.log('赋值后的 formData:', formData)
@@ -208,7 +210,7 @@ onMounted(() => {
   })
 })
 
-const doUpdate = (status) => {
+const doUpdate = (action) => {
   // 验证四象限是否已选择
   if (!selectedQuadrant.value) {
     ElMessage.error('请选择事项分类')
@@ -217,30 +219,83 @@ const doUpdate = (status) => {
 
   // 更新标签
   formData.tags = quadrantMap[selectedQuadrant.value].label
-  const newStatus = status === '已提交' ? '待审核' : status
-  formData.status = newStatus
 
   console.log('提交更新数据:', formData)
 
-  request.put('/apply/update', formData).then(res => {
+  const payload = { ...formData }
+
+  if (action === 'save') {
+    payload.status = formData.status || '待提交'
+    request.put('/apply/update', payload).then(res => {
+      if (res.code === '200') {
+        ElMessage.success('保存成功')
+        router.push('/team/history')
+      } else {
+        ElMessage.error(res.msg || '操作失败')
+      }
+    }).catch(err => {
+      console.error('更新失败:', err)
+      ElMessage.error(err.message || '更新失败')
+    })
+    return
+  }
+
+  if (formData.status === '待提交') {
+    payload.status = '待提交'
+    request.put('/apply/update', payload)
+        .then(() => request.post('/apply/startWorkflow', null, {
+          params: { applyId: formData.apply_ID }
+        }))
+        .then(res => {
+          if (res.code === '200') {
+            ElMessage.success('提交成功')
+            router.push('/team/history')
+          } else {
+            ElMessage.error(res.msg || '操作失败')
+          }
+        })
+        .catch(err => {
+          console.error('提交失败:', err)
+          ElMessage.error(err.message || '提交失败')
+        })
+    return
+  }
+
+  if (formData.status === '审核驳回') {
+    request.post('/apply/resubmit', payload).then(res => {
+      if (res.code === '200') {
+        ElMessage.success('提交成功')
+        router.push('/team/history')
+      } else {
+        ElMessage.error(res.msg || '操作失败')
+      }
+    }).catch(err => {
+      console.error('重新提交失败:', err)
+      ElMessage.error(err.message || '重新提交失败')
+    })
+    return
+  }
+
+  payload.status = formData.status
+  request.put('/apply/update', payload).then(res => {
     if (res.code === '200') {
-      ElMessage.success(status === '待提交' ? '保存成功' : '提交成功')
+      ElMessage.success('提交成功')
       router.push('/team/history')
     } else {
       ElMessage.error(res.msg || '操作失败')
     }
   }).catch(err => {
-    console.error('更新失败:', err)
-    ElMessage.error('更新失败')
+    console.error('提交失败:', err)
+    ElMessage.error(err.message || '提交失败')
   })
 }
 
 const handleSave = () => {
-  formRef.value.validate().then(() => doUpdate('待提交'))
+  formRef.value.validate().then(() => doUpdate('save'))
 }
 
 const handleSubmit = () => {
-  formRef.value.validate().then(() => doUpdate('已提交'))
+  formRef.value.validate().then(() => doUpdate('submit'))
 }
 </script>
 
