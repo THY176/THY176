@@ -1,6 +1,6 @@
 <<template>
   <div class="table-container">
-    <el-table :data="data" stripe style="width: 100%" v-loading="loading">
+    <el-table :data="displayData" stripe style="width: 100%" v-loading="loading">
       <el-table-column
           v-for="col in columns"
           :key="col.prop"
@@ -61,6 +61,15 @@ const currentPage = computed({
 const pageSize = computed({
   get: () => props.pageSize,
   set: (val) => emit('update:pageSize', val)
+})
+
+const displayData = computed(() => {
+  if (!props.showPagination || props.data.length <= pageSize.value) {
+    return props.data
+  }
+
+  const start = (currentPage.value - 1) * pageSize.value
+  return props.data.slice(start, start + pageSize.value)
 })
 
 const handlePageChange = () => {
