@@ -74,10 +74,15 @@ import {
 const barChart = ref(null)
 const pieChart = ref(null)
 const lineChart = ref(null)
+const latestChartData = ref({
+  clubs: [],
+  applies: []
+})
 
 let barInstance = null
 let pieInstance = null
 let lineInstance = null
+let resizeObserver = null
 
 const globalStats = reactive({
   totalClubs: 0,
@@ -154,6 +159,31 @@ const safeGetList = async (url) => {
   }
 }
 
+const waitForVisibleDom = (domRef) => {
+  return new Promise(resolve => {
+    let attempts = 0
+    const check = () => {
+      const el = domRef.value
+      if (!el) {
+        resolve(null)
+        return
+      }
+      const rect = el.getBoundingClientRect()
+      if (rect.width > 20 && rect.height > 20) {
+        resolve(el)
+        return
+      }
+      attempts += 1
+      if (attempts >= 30) {
+        resolve(el)
+        return
+      }
+      requestAnimationFrame(check)
+    }
+    requestAnimationFrame(check)
+  })
+}
+
 const kpiCards = computed(() => [
   {
     label: '社团总数',
@@ -202,10 +232,11 @@ const kpiCards = computed(() => [
 const getChart = (domRef, currentInstance) => {
   if (!domRef.value) return null
   if (currentInstance) return currentInstance
-  return echarts.init(domRef.value)
+  return echarts.init(domRef.value, null, { renderer: 'canvas' })
 }
 
-const renderTopClubChart = (clubs, applies) => {
+const renderTopClubChart = async (clubs, applies) => {
+  await waitForVisibleDom(barChart)
   const clubNameMap = new Map(clubs.map(club => [club.team_ID, club.team_name || `社团${club.team_ID}`]))
   const clubMoneyMap = new Map()
 
@@ -272,7 +303,8 @@ const renderTopClubChart = (clubs, applies) => {
   }, true)
 }
 
-const renderStatusChart = (applies) => {
+const renderStatusChart = async (applies) => {
+  await waitForVisibleDom(pieChart)
   const statusMap = Object.fromEntries(allStatuses.map(status => [status, 0]))
   applies.forEach(apply => {
     statusMap[apply.status] = (statusMap[apply.status] || 0) + 1
@@ -302,7 +334,8 @@ const renderStatusChart = (applies) => {
   }, true)
 }
 
-const renderMonthTrendChart = (applies) => {
+const renderMonthTrendChart = async (applies) => {
+  await waitForVisibleDom(lineChart)
   const months = recentSixMonths()
   const monthMap = Object.fromEntries(months.map(month => [month, 0]))
 
@@ -356,6 +389,7 @@ const loadStats = async () => {
     safeGetList('/apply/selectAll'),
     safeGetList('/reimburse/selectAll')
   ])
+  latestChartData.value = { clubs, applies }
   const reimburseMap = latestReimburseMap(reimburses)
   const reimbursedApplies = applies.filter(item => item.status === '已报销')
   const currentMonth = formatMonth(new Date())
@@ -375,11 +409,7 @@ const loadStats = async () => {
   }).length
 
   await nextTick()
-  renderTopClubChart(clubs, applies)
-  renderStatusChart(applies)
-  renderMonthTrendChart(applies)
-  requestAnimationFrame(resizeCharts)
-  setTimeout(resizeCharts, 200)
+  await renderAllCharts()
 }
 
 const resizeCharts = () => {
@@ -388,14 +418,41 @@ const resizeCharts = () => {
   lineInstance?.resize()
 }
 
+const renderAllCharts = async () => {
+  const { clubs, applies } = latestChartData.value
+  await Promise.all([
+    renderTopClubChart(clubs, applies),
+    renderStatusChart(applies),
+    renderMonthTrendChart(applies)
+  ])
+  resizeCharts()
+  requestAnimationFrame(resizeCharts)
+  setTimeout(resizeCharts, 300)
+  setTimeout(resizeCharts, 800)
+}
+
+const observeChartContainers = () => {
+  if (!window.ResizeObserver) return
+  resizeObserver?.disconnect()
+  resizeObserver = new ResizeObserver(() => {
+    resizeCharts()
+  })
+  ;[barChart.value, pieChart.value, lineChart.value]
+    .filter(Boolean)
+    .forEach(el => resizeObserver.observe(el))
+}
+
 onMounted(() => {
   loadStats()
+  nextTick(observeChartContainers)
   window.addEventListener('resize', resizeCharts)
 })
 
 onActivated(() => {
-  loadStats()
-  nextTick(resizeCharts)
+  nextTick(() => {
+    observeChartContainers()
+    renderAllCharts()
+  })
 })
 
 onBeforeUnmount(() => {
@@ -403,6 +460,7 @@ onBeforeUnmount(() => {
   barInstance?.dispose()
   pieInstance?.dispose()
   lineInstance?.dispose()
+  resizeObserver?.disconnect()
 })
 </script>
 

@@ -116,9 +116,14 @@ const funnelChart = ref(null)
 const durationChart = ref(null)
 const flowStats = ref([])
 const timelineList = ref([])
+const latestChartData = ref({
+  applies: [],
+  statsData: null
+})
 
 let funnelInstance = null
 let durationInstance = null
+let resizeObserver = null
 
 const workflowSummary = reactive({
   totalApplies: 0,
@@ -203,6 +208,31 @@ const safeGetList = async (url) => {
     console.warn(`工作流统计接口加载失败：${url}`, error)
     return []
   }
+}
+
+const waitForVisibleDom = (domRef) => {
+  return new Promise(resolve => {
+    let attempts = 0
+    const check = () => {
+      const el = domRef.value
+      if (!el) {
+        resolve(null)
+        return
+      }
+      const rect = el.getBoundingClientRect()
+      if (rect.width > 20 && rect.height > 20) {
+        resolve(el)
+        return
+      }
+      attempts += 1
+      if (attempts >= 30) {
+        resolve(el)
+        return
+      }
+      requestAnimationFrame(check)
+    }
+    requestAnimationFrame(check)
+  })
 }
 
 const getHoursDiff = (startTime, endTime) => {
@@ -339,10 +369,11 @@ const buildStats = (applies, approveMap, reimburseMap) => {
 const getChart = (domRef, currentInstance) => {
   if (!domRef.value) return null
   if (currentInstance) return currentInstance
-  return echarts.init(domRef.value)
+  return echarts.init(domRef.value, null, { renderer: 'canvas' })
 }
 
-const renderFunnelChart = (applies) => {
+const renderFunnelChart = async (applies) => {
+  await waitForVisibleDom(funnelChart)
   const counts = Object.fromEntries(funnelNodes.map(status => [status, 0]))
   applies.forEach(apply => {
     if (counts[apply.status] !== undefined) counts[apply.status] += 1
@@ -387,7 +418,8 @@ const renderFunnelChart = (applies) => {
   }, true)
 }
 
-const renderDurationChart = (statsData, applies) => {
+const renderDurationChart = async (statsData, applies) => {
+  await waitForVisibleDom(durationChart)
   const hasData = applies.length > 0
   const fallback = [2.5, 4.2, 3.8, 9.6, 12.4]
   const data = durationNodes.map((status, index) => {
@@ -486,13 +518,11 @@ const loadStats = async () => {
   const approveMap = getLatestApproveMap(approves)
   const reimburseMap = getLatestReimburseMap(reimburses)
   const statsData = buildStats(applies, approveMap, reimburseMap)
+  latestChartData.value = { applies, statsData }
 
   await nextTick()
-  renderFunnelChart(applies)
-  renderDurationChart(statsData, applies)
   buildTimeline(applies, approves, reimburses)
-  requestAnimationFrame(resizeCharts)
-  setTimeout(resizeCharts, 200)
+  await renderAllCharts()
 }
 
 const resizeCharts = () => {
@@ -500,8 +530,33 @@ const resizeCharts = () => {
   durationInstance?.resize()
 }
 
+const renderAllCharts = async () => {
+  const { applies, statsData } = latestChartData.value
+  if (!statsData) return
+  await Promise.all([
+    renderFunnelChart(applies),
+    renderDurationChart(statsData, applies)
+  ])
+  resizeCharts()
+  requestAnimationFrame(resizeCharts)
+  setTimeout(resizeCharts, 300)
+  setTimeout(resizeCharts, 800)
+}
+
+const observeChartContainers = () => {
+  if (!window.ResizeObserver) return
+  resizeObserver?.disconnect()
+  resizeObserver = new ResizeObserver(() => {
+    resizeCharts()
+  })
+  ;[funnelChart.value, durationChart.value]
+    .filter(Boolean)
+    .forEach(el => resizeObserver.observe(el))
+}
+
 onMounted(() => {
   loadStats()
+  nextTick(observeChartContainers)
   window.addEventListener('resize', resizeCharts)
 })
 
@@ -509,6 +564,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeCharts)
   funnelInstance?.dispose()
   durationInstance?.dispose()
+  resizeObserver?.disconnect()
 })
 </script>
 
