@@ -139,7 +139,6 @@ const openAuditDialog = async (row) => {
       let audits = res.data
       audits.sort((a, b) => new Date(b.approve_time) - new Date(a.approve_time))
       firstAudit.value = audits[0]
-      console.log('最新的一级审核记录:', firstAudit.value)
     } else {
       firstAudit.value = null
     }

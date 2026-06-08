@@ -166,7 +166,6 @@ const loadStats = async () => {
 
 // 监听成员删除事件，刷新统计数据
 const handleDataRefresh = () => {
-  console.log('收到数据刷新事件，重新加载统计数据')
   loadStats()
 }
 

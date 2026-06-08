@@ -87,7 +87,6 @@ const getHoursDiff = (startTime, endTime) => {
   const end = new Date(endTime)
   // 确保开始时间早于结束时间
   if (start > end) {
-    console.warn('时间顺序异常:', startTime, '晚于', endTime)
     return null
   }
   const diffMs = end - start
@@ -102,7 +101,6 @@ const searchFlow = async () => {
   }
 
   const applyRes = await request.get(`/apply/selectByapply_ID/${searchApplyId.value}`)
-  console.log('申请信息:', applyRes)
 
   if (applyRes.code !== '200' || !applyRes.data) {
     ElMessage.error('申请不存在')
@@ -116,7 +114,6 @@ const searchFlow = async () => {
   }
 
   const auditRes = await request.get(`/approve/selectByApply_ID/${apply.apply_ID}`)
-  console.log('审核记录:', auditRes)
 
   let audits = auditRes.code === '200' ? (auditRes.data || []) : []
 
@@ -130,7 +127,6 @@ const searchFlow = async () => {
     }
   })
   const latestAudits = Array.from(latestAuditsMap.values())
-  console.log('最新审核记录:', latestAudits)
 
   const steps = [
     {
@@ -199,7 +195,6 @@ const searchFlow = async () => {
 const loadStats = async () => {
   const applyRes = await request.get('/apply/selectAll')
   const applies = applyRes.code === '200' ? (applyRes.data || []) : []
-  console.log('所有申请:', applies)
 
   // 获取所有审核记录
   const approveRes = await request.get('/approve/selectAll')
@@ -321,7 +316,6 @@ const loadStats = async () => {
     avgTime: calculateAvg(data.times)
   }))
 
-  console.log('统计结果:', flowStats.value)
 }
 
 onMounted(() => {

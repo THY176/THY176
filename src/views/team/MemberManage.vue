@@ -259,7 +259,6 @@ const handleSubmit = () => {
     age: formData.value.age,
     team_ID: teamId
   }
-  console.log('提交数据:', submitData)
 
   if (isAdd.value) {
     // 新增：使用 POST
@@ -284,7 +283,6 @@ const handleSubmit = () => {
         ? `/student/update?oldId=${originalId.value}`
         : '/student/update'
 
-    console.log('请求URL:', url)
 
     request.put(url, submitData).then(res => {
       if (res.code === '200') {

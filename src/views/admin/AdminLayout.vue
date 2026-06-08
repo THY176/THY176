@@ -19,9 +19,6 @@ import CommonAside from '@/components/CommonAside.vue'
 const userStore = useUserStore()
 
 onMounted(() => {
-  console.log('AdminLayout - userStore.userInfo:', userStore.userInfo)
-  console.log('AdminLayout - userStore.userId:', userStore.userId)
-  console.log('AdminLayout - role:', userStore.role)
 })
 </script>
 

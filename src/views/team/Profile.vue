@@ -60,13 +60,10 @@ const loadInfo = () => {
     return
   }
 
-  console.log('从数据库加载社团信息，teamId:', teamId)
 
   request.get(`/team/selectByteam_ID/${teamId}`).then(res => {
-    console.log('社团信息返回:', res)
     if (res.code === '200' && res.data) {
       Object.assign(formData, res.data)
-      console.log('更新后的人数:', formData.number)
       // 同步更新 store 中的社团名称
       if (formData.team_name) {
         userStore.updateUserInfo({ team_name: formData.team_name })
@@ -96,7 +93,6 @@ const handleUpdate = () => {
 
 // 监听成员删除事件
 const handleMemberDeleted = () => {
-  console.log('收到成员删除事件，刷新社团信息')
   loadInfo()
 }
 

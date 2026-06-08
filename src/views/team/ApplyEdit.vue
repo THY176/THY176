@@ -160,18 +160,11 @@ const rules = {
 
 onMounted(() => {
   const apply_ID = route.params.apply_ID
-  console.log('编辑申请ID:', apply_ID)
 
   request.get(`/apply/selectByapply_ID/${apply_ID}`).then(res => {
-    console.log('后端返回的原始数据:', res)
 
     if (res.code === '200' && res.data) {
       const data = res.data
-      console.log('data 的所有字段:', Object.keys(data))
-      console.log('apply_money:', data.apply_money)
-      console.log('apply_type:', data.apply_type)
-      console.log('account_name:', data.account_name)
-      console.log('tags:', data.tags)
 
       // 直接使用 Object.assign 复制所有字段
       Object.assign(formData, {
@@ -189,13 +182,11 @@ onMounted(() => {
         processInstanceId: data.processInstanceId || ''
       })
 
-      console.log('赋值后的 formData:', formData)
 
       // 根据已有的 tags 设置选中的象限
       const quadrantKey = getQuadrantKey(formData.tags)
       if (quadrantKey) {
         selectedQuadrant.value = quadrantKey
-        console.log('已选中象限:', quadrantKey)
       }
 
       loading.value = false
@@ -220,7 +211,6 @@ const doUpdate = (action) => {
   // 更新标签
   formData.tags = quadrantMap[selectedQuadrant.value].label
 
-  console.log('提交更新数据:', formData)
 
   const payload = { ...formData }
 

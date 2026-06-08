@@ -26,10 +26,6 @@ const userStore = useUserStore()
 const router = useRouter()
 
 onMounted(() => {
-  console.log('TeamLayout - 检查用户信息:')
-  console.log('userInfo:', JSON.stringify(userStore.userInfo))
-  console.log('userId:', userStore.userId)
-  console.log('role:', userStore.role)
 
   // 如果没有 userId 但 role 是 team，说明数据有问题
   if (!userStore.userId && userStore.role === 'team') {

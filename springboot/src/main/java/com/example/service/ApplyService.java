@@ -48,9 +48,6 @@ public class ApplyService {
     }
 
     public void update(Apply apply) {
-        System.out.println("=== ApplyService.update ===");
-        System.out.println("apply_ID: " + apply.getApply_ID());
-        System.out.println("processInstanceId: " + apply.getProcessInstanceId());
         validateStatusUpdate(apply);
         applyMapper.updateByapply_ID(apply);
     }

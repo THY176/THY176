@@ -50,7 +50,6 @@ public class StudentController {
     @PostMapping("/add")
     public Result add(@RequestBody Student student) {
         bindTeamWrite(student);
-        log.info("新增成员请求参数: ID={}, team_ID={}, name={}", student.getID(), student.getTeam_ID(), student.getName());
         try {
             studentService.add(student);
             // 更新对应社团的人数
@@ -66,7 +65,6 @@ public class StudentController {
 
     @PutMapping("/update")
     public Result update(@RequestBody Student student) {
-        log.info("更新成员请求参数: ID={}, name={}", student.getID(), student.getName());
         try {
             if (!canAccessStudent(student.getID())) {
                 return forbidden();
@@ -84,49 +82,33 @@ public class StudentController {
 
     @DeleteMapping("/delByID/{ID}")
     public Result delByID(@PathVariable Integer ID) {
-        System.out.println("=== 删除成员开始 === ID=" + ID);
         try {
             // 先获取成员信息
             if (!canAccessStudent(ID)) {
                 return forbidden();
             }
             Student student = studentService.selectByID(ID);
-            System.out.println("查询到的 student 对象: " + student);
-            System.out.println("student.getTeam_ID(): " + (student != null ? student.getTeam_ID() : "null"));
 
             if (student == null) {
                 return Result.error("成员不存在");
             }
 
             Integer teamId = student.getTeam_ID();
-            System.out.println("成员所属社团ID: " + teamId);
 
             if (teamId == null) {
-                System.err.println("警告：成员的 team_ID 为 null，无法更新社团人数！");
                 // 仍然执行删除，但不更新人数
                 studentService.delByID(ID);
                 return Result.success("删除成功，但该成员没有关联社团，未更新人数");
             }
 
-            // 删除前统计
-            int beforeCount = studentService.countByTeamId(teamId);
-            System.out.println("删除前社团人数: " + beforeCount);
-
             // 执行删除
             studentService.delByID(ID);
-            System.out.println("删除成功");
-
-            // 删除后统计
-            int afterCount = studentService.countByTeamId(teamId);
-            System.out.println("删除后社团人数(实际学生数): " + afterCount);
 
             // 更新社团人数
-            int updatedCount = studentService.updateTeamNumber(teamId);
-            System.out.println("更新后社团表人数: " + updatedCount);
+            studentService.updateTeamNumber(teamId);
 
             return Result.success();
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("删除成员失败: " + e.getMessage());
         }
     }

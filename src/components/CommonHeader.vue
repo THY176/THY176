@@ -35,7 +35,6 @@ const router = useRouter()
 // 计算显示名称
 const displayName = computed(() => {
   const info = userStore.userInfo
-  console.log('CommonHeader - userInfo:', info)
 
   if (info.role === 'team') {
     return info.team_name || info.teamName || '未知社团'

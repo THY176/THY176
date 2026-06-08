@@ -209,7 +209,6 @@ public class ApplyController {
 
             return Result.success();
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("提交失败: " + e.getMessage());
         }
     }
@@ -251,7 +250,6 @@ public class ApplyController {
 
             return Result.success();
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("启动工作流失败: " + e.getMessage());
         }
     }
@@ -278,7 +276,6 @@ public class ApplyController {
 
             return Result.success();
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("重新提交失败: " + e.getMessage());
         }
     }

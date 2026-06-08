@@ -59,7 +59,6 @@ onMounted(() => {
   const userId = userStore.userId
   const userRole = userStore.role
 
-  console.log('当前用户 - userId:', userId, 'role:', userRole)
 
   if (!userId) {
     ElMessage.error('未获取到用户信息，请重新登录')
@@ -77,10 +76,8 @@ onMounted(() => {
     return
   }
 
-  console.log('请求URL:', apiUrl)
 
   request.get(apiUrl).then(res => {
-    console.log('用户信息返回:', res)
     if (res.code === '200' && res.data) {
       formData.teacher_ID = res.data.teacher_ID || userId
       formData.name = res.data.name || ''

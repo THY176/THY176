@@ -108,7 +108,6 @@ const auditRules = {
 // 加载待审核任务（通过工作流接口）
 const load = async () => {
   if (!userStore.userId) {
-    console.log('用户未登录')
     return
   }
 
@@ -134,7 +133,6 @@ const load = async () => {
       })
       tasks = Array.from(uniqueMap.values())
 
-      console.log('过滤后的任务列表:', tasks)
 
       tableData.value = tasks.map(task => {
         const applyInfo = task.apply || {}

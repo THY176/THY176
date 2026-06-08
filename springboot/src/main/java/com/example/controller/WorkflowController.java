@@ -65,7 +65,6 @@ public class WorkflowController {
             workflowService.firstAudit(taskId, applyId, teacherId, teacherName, opinion, approved);
             return Result.success(approved ? "审核通过" : "审核驳回");
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("审核失败: " + e.getMessage());
         }
     }
@@ -84,7 +83,6 @@ public class WorkflowController {
             workflowService.secondAudit(taskId, applyId, adminId, adminName, opinion, approved);
             return Result.success(approved ? "审核通过" : "审核驳回");
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("审核失败: " + e.getMessage());
         }
     }
@@ -103,7 +101,6 @@ public class WorkflowController {
             workflowService.thirdAudit(taskId, applyId, adminId, adminName, opinion, approved);
             return Result.success(approved ? "审核通过" : "审核驳回");
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("审核失败: " + e.getMessage());
         }
     }
@@ -121,7 +118,6 @@ public class WorkflowController {
             workflowService.executeReimburse(taskId, applyId, financeId, financeName, reimburseAmount);
             return Result.success("报销成功");
         } catch (Exception e) {
-            e.printStackTrace();
             return Result.error("报销失败: " + e.getMessage());
         }
     }

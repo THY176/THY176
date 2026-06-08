@@ -58,7 +58,6 @@ const formData = reactive({
 
 const loadAdminInfo = () => {
   const teacherId = userStore.userId
-  console.log('当前管理员ID:', teacherId)
 
   if (!teacherId) {
     ElMessage.error('未获取到管理员信息，请重新登录')
@@ -69,10 +68,8 @@ const loadAdminInfo = () => {
   }
 
   request.get(`/admin/selectByteacher_ID/${teacherId}`).then(res => {
-    console.log('管理员信息返回:', res)
     if (res.code === '200' && res.data) {
       Object.assign(formData, res.data)
-      console.log('加载后的formData:', formData)
     } else {
       ElMessage.error('加载管理员信息失败')
     }

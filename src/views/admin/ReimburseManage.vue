@@ -124,7 +124,6 @@ const loadClubs = async () => {
     clubs.forEach(club => {
       clubMap.value.set(club.team_ID, club.team_name)
     })
-    console.log('社团映射表:', clubMap.value)
   }
 }
 
@@ -184,7 +183,6 @@ const load = async () => {
 
   tableData.value = list
   total.value = list.length
-  console.log('报销管理表格数据:', tableData.value)
 }
 
 // 查询方法

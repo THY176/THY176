@@ -224,7 +224,6 @@ const handleSubmit = () => {
         age: formData.age,
         team_ID: formData.team_ID
       }
-      console.log('新增数据:', submitData)
       request.post('/student/add', submitData).then(res => {
         if (res.code === '200') {
           ElMessage.success('新增成功')
@@ -250,7 +249,6 @@ const handleSubmit = () => {
         age: formData.age,
         team_ID: formData.team_ID
       }
-      console.log('编辑数据:', submitData)
       request.put('/student/update', submitData).then(res => {
         if (res.code === '200') {
           ElMessage.success('修改成功')

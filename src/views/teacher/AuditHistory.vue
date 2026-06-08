@@ -44,7 +44,6 @@ const columns = [
 const load = async () => {
   // 检查用户是否登录
   if (!userStore.userId) {
-    console.log('用户未登录')
     return
   }
 

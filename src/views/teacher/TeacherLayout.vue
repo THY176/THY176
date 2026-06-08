@@ -19,10 +19,6 @@ import CommonAside from '@/components/CommonAside.vue'
 const userStore = useUserStore()
 
 onMounted(() => {
-  console.log('TeacherLayout - userInfo:', userStore.userInfo)
-  console.log('TeacherLayout - userId:', userStore.userId)
-  console.log('TeacherLayout - role:', userStore.role)
-  console.log('TeacherLayout - token:', userStore.token)
 })
 </script>
 
