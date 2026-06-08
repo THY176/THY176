@@ -65,6 +65,9 @@ public class ApplyService {
         if (existing == null) {
             throw new RuntimeException("申请不存在");
         }
+        if ("已报销".equals(existing.getStatus())) {
+            throw new RuntimeException("已报销申请不能强制驳回");
+        }
         if (hasActiveProcess(existing)) {
             runtimeService.deleteProcessInstance(
                     existing.getProcessInstanceId(),
@@ -96,7 +99,7 @@ public class ApplyService {
         if ("待二次审核".equals(status)) {
             return 2;
         }
-        if ("待三次审核".equals(status) || "审核通过".equals(status) || "已报销".equals(status)) {
+        if ("待三次审核".equals(status) || "审核通过".equals(status)) {
             return 3;
         }
         return 99;

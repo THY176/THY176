@@ -46,7 +46,7 @@
         </template>
         <template #action="{ row }">
           <el-button type="info" size="small" @click="viewDetail(row)">详情</el-button>
-          <el-button type="warning" size="small" @click="forceReject(row)">强制驳回</el-button>
+          <el-button v-if="row.status !== '已报销'" type="warning" size="small" @click="forceReject(row)">强制驳回</el-button>
           <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
         </template>
       </CommonTable>
@@ -331,6 +331,10 @@ const viewDetail = async (row) => {
 }
 
 const forceReject = (row) => {
+  if (row.status === '已报销') {
+    ElMessage.warning('已报销申请不能强制驳回')
+    return
+  }
   currentApply.value = row
   rejectOpinion.value = ''
   statusVisible.value = true
