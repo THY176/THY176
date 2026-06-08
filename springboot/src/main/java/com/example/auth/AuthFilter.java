@@ -1,6 +1,12 @@
 package com.example.auth;
 
 import com.example.common.Result;
+import com.example.entity.Apply;
+import com.example.entity.Student;
+import com.example.entity.Team;
+import com.example.mapper.ApplyMapper;
+import com.example.mapper.StudentMapper;
+import com.example.mapper.TeamMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,10 +25,20 @@ import java.io.IOException;
 public class AuthFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
+    private final ApplyMapper applyMapper;
+    private final StudentMapper studentMapper;
+    private final TeamMapper teamMapper;
 
-    public AuthFilter(JwtService jwtService, ObjectMapper objectMapper) {
+    public AuthFilter(JwtService jwtService,
+                      ObjectMapper objectMapper,
+                      ApplyMapper applyMapper,
+                      StudentMapper studentMapper,
+                      TeamMapper teamMapper) {
         this.jwtService = jwtService;
         this.objectMapper = objectMapper;
+        this.applyMapper = applyMapper;
+        this.studentMapper = studentMapper;
+        this.teamMapper = teamMapper;
     }
 
     @Override
@@ -69,25 +85,159 @@ public class AuthFilter extends OncePerRequestFilter {
         }
 
         if ("teacher".equals(role)) {
-            return path.startsWith("/teacher/")
-                    || path.startsWith("/workflow/teacher/")
-                    || path.equals("/workflow/firstAudit")
-                    || ("GET".equals(method) && path.startsWith("/workflow/currentTask/"))
-                    || ("GET".equals(method) && path.startsWith("/apply/selectByapply_ID/"))
-                    || ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/"))
-                    || ("GET".equals(method) && path.startsWith("/approve/selectByTeacher_ID/"));
+            return isTeacherAllowed(user, request, path, method);
         }
 
         if ("team".equals(role)) {
-            return path.startsWith("/team/")
-                    || path.startsWith("/student/")
-                    || path.startsWith("/apply/")
-                    || ("GET".equals(method) && path.startsWith("/workflow/currentTask/"))
-                    || ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/"))
-                    || ("GET".equals(method) && path.startsWith("/reimburse/selectByApply_ID/"));
+            return isTeamAllowed(user, request, path, method);
         }
 
         return false;
+    }
+
+    private boolean isTeacherAllowed(AuthUser user, HttpServletRequest request, String path, String method) {
+        if ("GET".equals(method) && path.startsWith("/teacher/selectByteacher_ID/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/teacher/selectByteacher_ID/"));
+        }
+        if ("PUT".equals(method) && path.equals("/teacher/update")) {
+            return true;
+        }
+        if ("GET".equals(method) && path.startsWith("/workflow/teacher/tasks/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/workflow/teacher/tasks/"));
+        }
+        if ("POST".equals(method) && path.equals("/workflow/firstAudit")) {
+            return isCurrentUser(user, parseInteger(request.getParameter("teacherId")));
+        }
+        if ("GET".equals(method) && path.startsWith("/workflow/currentTask/")) {
+            return isTeacherApply(user, pathIdAfterPrefix(path, "/workflow/currentTask/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/apply/selectByapply_ID/")) {
+            return isTeacherApply(user, pathIdAfterPrefix(path, "/apply/selectByapply_ID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/")) {
+            return isTeacherApply(user, pathIdAfterPrefix(path, "/approve/selectByApply_ID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/approve/selectByTeacher_ID/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/approve/selectByTeacher_ID/"));
+        }
+        return false;
+    }
+
+    private boolean isTeamAllowed(AuthUser user, HttpServletRequest request, String path, String method) {
+        if ("GET".equals(method) && path.startsWith("/team/selectByteam_ID/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/team/selectByteam_ID/"));
+        }
+        if ("GET".equals(method) && (path.equals("/team/selectAll") || path.equals("/team/selectPage"))) {
+            return true;
+        }
+        if ("PUT".equals(method) && path.equals("/team/update")) {
+            return true;
+        }
+
+        if ("GET".equals(method) && (path.equals("/apply/selectAll") || path.equals("/apply/selectPage"))) {
+            return true;
+        }
+        if ("POST".equals(method) && (path.equals("/apply/add") || path.equals("/apply/submit"))) {
+            return true;
+        }
+        if ("PUT".equals(method) && path.equals("/apply/update")) {
+            return true;
+        }
+        if ("POST".equals(method) && path.equals("/apply/resubmit")) {
+            return true;
+        }
+        if ("POST".equals(method) && path.equals("/apply/startWorkflow")) {
+            return isOwnApply(user, parseInteger(request.getParameter("applyId")));
+        }
+        if ("DELETE".equals(method) && path.startsWith("/apply/delByapply_ID/")) {
+            return isOwnApply(user, pathIdAfterPrefix(path, "/apply/delByapply_ID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/apply/selectByapply_ID/")) {
+            return isOwnApply(user, pathIdAfterPrefix(path, "/apply/selectByapply_ID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/apply/selectByTeam_ID/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/apply/selectByTeam_ID/"));
+        }
+
+        if ("GET".equals(method) && (path.equals("/student/selectAll") || path.equals("/student/selectPage"))) {
+            return true;
+        }
+        if ("POST".equals(method) && path.equals("/student/add")) {
+            return true;
+        }
+        if ("PUT".equals(method) && path.equals("/student/update")) {
+            return true;
+        }
+        if ("GET".equals(method) && path.startsWith("/student/selectByID/")) {
+            return isOwnStudent(user, pathIdAfterPrefix(path, "/student/selectByID/"));
+        }
+        if ("DELETE".equals(method) && path.startsWith("/student/delByID/")) {
+            return isOwnStudent(user, pathIdAfterPrefix(path, "/student/delByID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/student/selectByTeam_ID/")) {
+            return isCurrentUser(user, pathIdAfterPrefix(path, "/student/selectByTeam_ID/"));
+        }
+
+        if ("GET".equals(method) && path.startsWith("/workflow/currentTask/")) {
+            return isOwnApply(user, pathIdAfterPrefix(path, "/workflow/currentTask/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/approve/selectByApply_ID/")) {
+            return isOwnApply(user, pathIdAfterPrefix(path, "/approve/selectByApply_ID/"));
+        }
+        if ("GET".equals(method) && path.startsWith("/reimburse/selectByApply_ID/")) {
+            return isOwnApply(user, pathIdAfterPrefix(path, "/reimburse/selectByApply_ID/"));
+        }
+        return false;
+    }
+
+    private boolean isCurrentUser(AuthUser user, Integer id) {
+        return id != null && id.equals(user.getId());
+    }
+
+    private boolean isOwnApply(AuthUser user, Integer applyId) {
+        if (applyId == null) {
+            return false;
+        }
+        Apply apply = applyMapper.selectByapply_ID(applyId);
+        return apply != null && isCurrentUser(user, apply.getTeam_ID());
+    }
+
+    private boolean isTeacherApply(AuthUser user, Integer applyId) {
+        if (applyId == null) {
+            return false;
+        }
+        Apply apply = applyMapper.selectByapply_ID(applyId);
+        if (apply == null || apply.getTeam_ID() == null) {
+            return false;
+        }
+        Team team = teamMapper.selectByteam_ID(apply.getTeam_ID());
+        return team != null && isCurrentUser(user, team.getTeacher_ID());
+    }
+
+    private boolean isOwnStudent(AuthUser user, Integer studentId) {
+        if (studentId == null) {
+            return false;
+        }
+        Student student = studentMapper.selectByID(studentId);
+        return student != null && isCurrentUser(user, student.getTeam_ID());
+    }
+
+    private Integer pathIdAfterPrefix(String path, String prefix) {
+        if (!path.startsWith(prefix)) {
+            return null;
+        }
+        return parseInteger(path.substring(prefix.length()));
+    }
+
+    private Integer parseInteger(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private void writeError(HttpServletResponse response, int status, String code, String message) throws IOException {

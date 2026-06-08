@@ -1,5 +1,7 @@
 package com.example.controller;
 
+import com.example.auth.AuthContext;
+import com.example.auth.AuthUser;
 import com.example.common.Result;
 import com.example.entity.Student;
 import com.example.service.StudentService;
@@ -22,12 +24,16 @@ public class StudentController {
 
     @GetMapping("/selectAll")
     public Result selectAll(Student student) {
+        bindTeamQuery(student);
         List<Student> list = studentService.selectAll(student);
         return Result.success(list);
     }
 
     @GetMapping("/selectByID/{ID}")
     public Result selectByID(@PathVariable Integer ID) {
+        if (!canAccessStudent(ID)) {
+            return forbidden();
+        }
         Student student = studentService.selectByID(ID);
         return Result.success(student);
     }
@@ -36,12 +42,14 @@ public class StudentController {
     public Result selectPage(Student student,
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
+        bindTeamQuery(student);
         PageInfo<Student> pageInfo = studentService.selectPage(student, pageNum, pageSize);
         return Result.success(pageInfo);
     }
 
     @PostMapping("/add")
     public Result add(@RequestBody Student student) {
+        bindTeamWrite(student);
         log.info("新增成员请求参数: ID={}, team_ID={}, name={}", student.getID(), student.getTeam_ID(), student.getName());
         try {
             studentService.add(student);
@@ -60,6 +68,12 @@ public class StudentController {
     public Result update(@RequestBody Student student) {
         log.info("更新成员请求参数: ID={}, name={}", student.getID(), student.getName());
         try {
+            if (!canAccessStudent(student.getID())) {
+                return forbidden();
+            }
+            if (isTeamUser()) {
+                student.setTeam_ID(currentUser().getId());
+            }
             studentService.update(student);
             return Result.success();
         } catch (Exception e) {
@@ -73,6 +87,9 @@ public class StudentController {
         System.out.println("=== 删除成员开始 === ID=" + ID);
         try {
             // 先获取成员信息
+            if (!canAccessStudent(ID)) {
+                return forbidden();
+            }
             Student student = studentService.selectByID(ID);
             System.out.println("查询到的 student 对象: " + student);
             System.out.println("student.getTeam_ID(): " + (student != null ? student.getTeam_ID() : "null"));
@@ -116,12 +133,20 @@ public class StudentController {
 
     @DeleteMapping("/delBatch")
     public Result delBatch(@RequestBody List<Integer> IDs) {
+        for (Integer id : IDs) {
+            if (!canAccessStudent(id)) {
+                return forbidden();
+            }
+        }
         studentService.delBatch(IDs);
         return Result.success();
     }
 
     @GetMapping("/selectByTeam_ID/{team_ID}")
     public Result selectByTeam_ID(@PathVariable Integer team_ID) {
+        if (isTeamUser() && !currentUser().getId().equals(team_ID)) {
+            return forbidden();
+        }
         List<Student> list = studentService.selectByTeam_ID(team_ID);
         return Result.success(list);
     }
@@ -130,5 +155,41 @@ public class StudentController {
     public Result selectByRole(@PathVariable String role) {
         List<Student> list = studentService.selectByRole(role);
         return Result.success(list);
+    }
+
+    private void bindTeamQuery(Student student) {
+        if (isTeamUser()) {
+            student.setTeam_ID(currentUser().getId());
+        }
+    }
+
+    private void bindTeamWrite(Student student) {
+        if (isTeamUser()) {
+            student.setTeam_ID(currentUser().getId());
+        }
+    }
+
+    private boolean canAccessStudent(Integer id) {
+        if (!isTeamUser()) {
+            return true;
+        }
+        if (id == null) {
+            return false;
+        }
+        Student student = studentService.selectByID(id);
+        return student != null && currentUser().getId().equals(student.getTeam_ID());
+    }
+
+    private boolean isTeamUser() {
+        AuthUser user = currentUser();
+        return user != null && "team".equals(user.getRole());
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.get();
+    }
+
+    private Result forbidden() {
+        return Result.error("403", "无权操作该成员");
     }
 }

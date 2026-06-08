@@ -1,5 +1,7 @@
 package com.example.controller;
 
+import com.example.auth.AuthContext;
+import com.example.auth.AuthUser;
 import com.example.common.Result;
 import com.example.entity.Team;
 import com.example.service.TeamService;
@@ -18,6 +20,7 @@ public class TeamController {
 
     @GetMapping("/selectAll")
     public Result selectAll(Team team) {
+        bindTeamQuery(team);
         List<Team> list = teamService.selectAll(team);
         list.forEach(this::clearPassword);
         return Result.success(list);
@@ -25,6 +28,9 @@ public class TeamController {
 
     @GetMapping("/selectByteam_ID/{team_ID}")
     public Result selectByteam_ID(@PathVariable Integer team_ID) {
+        if (isTeamUser() && !currentUser().getId().equals(team_ID)) {
+            return forbidden();
+        }
         Team team = teamService.selectByteam_ID(team_ID);
         clearPassword(team);
         return Result.success(team);
@@ -34,6 +40,7 @@ public class TeamController {
     public Result selectPage(Team team,
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
+        bindTeamQuery(team);
         PageInfo<Team> pageInfo = teamService.selectPage(team, pageNum, pageSize);
         pageInfo.getList().forEach(this::clearPassword);
         return Result.success(pageInfo);
@@ -47,6 +54,16 @@ public class TeamController {
 
     @PutMapping("/update")
     public Result update(@RequestBody Team team) {
+        if (isTeamUser()) {
+            if (team.getTeam_ID() != null && !currentUser().getId().equals(team.getTeam_ID())) {
+                return forbidden();
+            }
+            Team existing = teamService.selectByteam_ID(currentUser().getId());
+            team.setTeam_ID(currentUser().getId());
+            if (existing != null) {
+                team.setTeacher_ID(existing.getTeacher_ID());
+            }
+        }
         teamService.update(team);
         return Result.success();
     }
@@ -81,5 +98,24 @@ public class TeamController {
         if (team != null) {
             team.setPassword(null);
         }
+    }
+
+    private void bindTeamQuery(Team team) {
+        if (isTeamUser()) {
+            team.setTeam_ID(currentUser().getId());
+        }
+    }
+
+    private boolean isTeamUser() {
+        AuthUser user = currentUser();
+        return user != null && "team".equals(user.getRole());
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.get();
+    }
+
+    private Result forbidden() {
+        return Result.error("403", "无权操作该社团");
     }
 }

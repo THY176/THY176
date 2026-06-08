@@ -1,5 +1,7 @@
 package com.example.controller;
 
+import com.example.auth.AuthContext;
+import com.example.auth.AuthUser;
 import com.example.common.Result;
 import com.example.entity.Apply;
 import com.example.entity.Team;
@@ -31,12 +33,16 @@ public class ApplyController {
 
     @GetMapping("/selectAll")
     public Result selectAll(Apply apply) {
+        bindTeamQuery(apply);
         List<Apply> list = applyService.selectAll(apply);
         return Result.success(list);
     }
 
     @GetMapping("/selectByapply_ID/{apply_ID}")
     public Result selectByapply_ID(@PathVariable Integer apply_ID) {
+        if (!canAccessApply(apply_ID)) {
+            return forbidden();
+        }
         Apply apply = applyService.selectByapply_ID(apply_ID);
         return Result.success(apply);
     }
@@ -45,12 +51,14 @@ public class ApplyController {
     public Result selectPage(Apply apply,
                              @RequestParam(defaultValue = "1") Integer pageNum,
                              @RequestParam(defaultValue = "10") Integer pageSize) {
+        bindTeamQuery(apply);
         PageInfo<Apply> pageInfo = applyService.selectPage(apply, pageNum, pageSize);
         return Result.success(pageInfo);
     }
 
     @PostMapping("/add")
     public Result add(@RequestBody Apply apply) {
+        bindTeamWrite(apply);
         applyService.add(apply);
         return Result.success();
     }
@@ -58,6 +66,14 @@ public class ApplyController {
     @PutMapping("/update")
     public Result update(@RequestBody Apply apply) {
         try {
+            if (!canAccessApply(apply.getApply_ID())) {
+                return forbidden();
+            }
+            if (isTeamUser()) {
+                apply.setTeam_ID(currentUser().getId());
+                apply.setStatus(null);
+                apply.setProcessInstanceId(null);
+            }
             applyService.update(apply);
             return Result.success();
         } catch (Exception e) {
@@ -80,18 +96,29 @@ public class ApplyController {
 
     @DeleteMapping("/delByapply_ID/{apply_ID}")
     public Result delByapply_ID(@PathVariable Integer apply_ID) {
+        if (!canAccessApply(apply_ID)) {
+            return forbidden();
+        }
         applyService.delByapply_ID(apply_ID);
         return Result.success();
     }
 
     @DeleteMapping("/delBatch")
     public Result delBatch(@RequestBody List<Integer> apply_IDs) {
+        for (Integer applyId : apply_IDs) {
+            if (!canAccessApply(applyId)) {
+                return forbidden();
+            }
+        }
         applyService.delBatch(apply_IDs);
         return Result.success();
     }
 
     @GetMapping("/selectByTeam_ID/{team_ID}")
     public Result selectByTeam_ID(@PathVariable Integer team_ID) {
+        if (isTeamUser() && !currentUser().getId().equals(team_ID)) {
+            return forbidden();
+        }
         List<Apply> list = applyService.selectByTeam_ID(team_ID);
         return Result.success(list);
     }
@@ -116,18 +143,27 @@ public class ApplyController {
 
     @PostMapping("/addTags")
     public Result addTags(@RequestParam Integer apply_ID, @RequestParam String tags) {
+        if (!canAccessApply(apply_ID)) {
+            return forbidden();
+        }
         applyService.addTags(apply_ID, tags);
         return Result.success();
     }
 
     @DeleteMapping("/delTags")
     public Result delTags(@RequestParam Integer apply_ID, @RequestParam String tags) {
+        if (!canAccessApply(apply_ID)) {
+            return forbidden();
+        }
         applyService.delTags(apply_ID, tags);
         return Result.success();
     }
 
     @GetMapping("/getTags/{apply_ID}")
     public Result getTags(@PathVariable Integer apply_ID) {
+        if (!canAccessApply(apply_ID)) {
+            return forbidden();
+        }
         Apply apply = applyService.selectByapply_ID(apply_ID);
         String tags = apply.getTags();
         List<String> tagList = (tags == null || tags.isEmpty())
@@ -143,6 +179,7 @@ public class ApplyController {
     public Result submit(@RequestBody Apply apply) {
         try {
             // 1. 保存申请
+            bindTeamWrite(apply);
             apply.setApply_time(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
             apply.setStatus("待审核");
             applyService.add(apply);
@@ -183,6 +220,9 @@ public class ApplyController {
     public Result startWorkflow(@RequestParam Integer applyId) {
         try {
             Apply apply = applyService.selectByapply_ID(applyId);
+            if (!canAccessApply(applyId)) {
+                return forbidden();
+            }
             if (apply == null) {
                 return Result.error("申请不存在");
             }
@@ -221,10 +261,16 @@ public class ApplyController {
     public Result resubmit(@RequestBody Apply apply) {
         try {
             Apply existing = applyService.selectByapply_ID(apply.getApply_ID());
+            if (!canAccessApply(apply.getApply_ID())) {
+                return forbidden();
+            }
             if (existing == null) {
                 return Result.error("申请不存在");
             }
 
+            if (isTeamUser()) {
+                apply.setTeam_ID(existing.getTeam_ID());
+            }
             apply.setStatus(null);
             apply.setProcessInstanceId(null);
             applyService.update(apply);
@@ -235,6 +281,42 @@ public class ApplyController {
             e.printStackTrace();
             return Result.error("重新提交失败: " + e.getMessage());
         }
+    }
+
+    private void bindTeamQuery(Apply apply) {
+        if (isTeamUser()) {
+            apply.setTeam_ID(currentUser().getId());
+        }
+    }
+
+    private void bindTeamWrite(Apply apply) {
+        if (isTeamUser()) {
+            apply.setTeam_ID(currentUser().getId());
+        }
+    }
+
+    private boolean canAccessApply(Integer applyId) {
+        if (!isTeamUser()) {
+            return true;
+        }
+        if (applyId == null) {
+            return false;
+        }
+        Apply apply = applyService.selectByapply_ID(applyId);
+        return apply != null && currentUser().getId().equals(apply.getTeam_ID());
+    }
+
+    private boolean isTeamUser() {
+        AuthUser user = currentUser();
+        return user != null && "team".equals(user.getRole());
+    }
+
+    private AuthUser currentUser() {
+        return AuthContext.get();
+    }
+
+    private Result forbidden() {
+        return Result.error("403", "无权操作该申请");
     }
 
 }
