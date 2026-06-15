@@ -21,7 +21,7 @@
       </CommonTable>
     </el-card>
 
-    <CommonDialog :title="dialogTitle" v-model:visible="dialogVisible" :form-data="formData" :rules="rules" @submit="handleSubmit">
+    <CommonDialog :title="dialogTitle" v-model:visible="dialogVisible" :form-data="formData" :rules="rules" :submit-loading="submitting" @submit="handleSubmit">
       <template #form-items>
         <el-form-item label="工号" prop="teacher_ID" v-if="isAdd">
           <el-input v-model="formData.teacher_ID" placeholder="请输入教师工号" />
@@ -78,6 +78,7 @@ const columns = [
 ]
 
 const dialogVisible = ref(false)
+const submitting = ref(false)
 const isAdd = ref(true)
 const dialogTitle = computed(() => isAdd.value ? '新增教师' : '编辑教师')
 
@@ -91,11 +92,37 @@ const formData = reactive({
   age: 30
 })
 
+const validateTeacherId = (_rule, value, callback) => {
+  const id = Number(value)
+  if (!Number.isInteger(id) || id <= 0) {
+    callback(new Error('工号必须是正整数'))
+    return
+  }
+  callback()
+}
+
+const validatePhone = (_rule, value, callback) => {
+  const phone = String(value || '').trim()
+  if (!/^\d{1,11}$/.test(phone)) {
+    callback(new Error('电话必须是 1 到 11 位数字'))
+    return
+  }
+  callback()
+}
+
 const rules = {
-  teacher_ID: [{ required: true, message: '请输入工号', trigger: 'blur' }],
+  teacher_ID: [
+    { required: true, message: '请输入工号', trigger: 'blur' },
+    { validator: validateTeacherId, trigger: 'blur' }
+  ],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  tele: [{ required: true, message: '请输入电话', trigger: 'blur' }]
+  tele: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { validator: validatePhone, trigger: 'blur' }
+  ],
+  gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  age: [{ required: true, message: '请输入年龄', trigger: 'change' }]
 }
 
 const loadClubs = async () => {
@@ -166,9 +193,19 @@ const openEditDialog = (row) => {
 }
 
 const handleSubmit = () => {
+  submitting.value = true
   if (isAdd.value) {
     // 新增：使用 POST
-    request.post('/teacher/add', formData).then(res => {
+    const submitData = {
+      teacher_ID: Number(formData.teacher_ID),
+      name: String(formData.name || '').trim(),
+      team_ID: formData.team_ID || null,
+      password: String(formData.password || '').trim(),
+      tele: String(formData.tele || '').trim(),
+      gender: formData.gender,
+      age: formData.age
+    }
+    request.post('/teacher/add', submitData).then(res => {
       if (res.code === '200') {
         ElMessage.success('新增成功')
         dialogVisible.value = false
@@ -176,13 +213,25 @@ const handleSubmit = () => {
       } else {
         ElMessage.error(res.msg || '新增失败')
       }
+    }).catch(err => {
+      console.error('新增失败:', err)
+    }).finally(() => {
+      submitting.value = false
     })
   } else {
     // 编辑：使用 PUT
-    const updateData = { ...formData }
+    const updateData = {
+      ...formData,
+      teacher_ID: Number(formData.teacher_ID),
+      name: String(formData.name || '').trim(),
+      team_ID: formData.team_ID || null,
+      tele: String(formData.tele || '').trim()
+    }
     // 如果密码为空，删除密码字段（不修改密码）
     if (!updateData.password || updateData.password === '') {
       delete updateData.password
+    } else {
+      updateData.password = String(updateData.password).trim()
     }
 
     request.put('/teacher/update', updateData).then(res => {
@@ -193,6 +242,10 @@ const handleSubmit = () => {
       } else {
         ElMessage.error(res.msg || '修改失败')
       }
+    }).catch(err => {
+      console.error('修改失败:', err)
+    }).finally(() => {
+      submitting.value = false
     })
   }
 }

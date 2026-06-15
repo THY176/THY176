@@ -59,12 +59,12 @@
         v-model:visible="dialogVisible"
         :form-data="formData"
         :rules="rules"
+        :submit-loading="submitting"
         @submit="handleSubmit"
     >
       <template #form-items>
-        <!-- 学号输入框，新增和编辑都可编辑 -->
         <el-form-item label="学号" prop="ID">
-          <el-input v-model="formData.ID" placeholder="请输入学号" />
+          <el-input v-model="formData.ID" placeholder="请输入学号" :disabled="!isAdd" />
         </el-form-item>
         <el-form-item label="姓名" prop="name">
           <el-input v-model="formData.name" placeholder="请输入姓名" />
@@ -94,7 +94,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, computed, onMounted, watch, nextTick } from 'vue'
+import { reactive, ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user.js'
 import request from '@/utils/request.js'
@@ -116,11 +116,9 @@ const tableData = ref([])
 const loading = ref(false)
 
 const dialogVisible = ref(false)
+const submitting = ref(false)
 const isAdd = ref(true)
 const dialogTitle = computed(() => isAdd.value ? '新增成员' : '编辑成员')
-
-// 保存原学号，用于编辑时判断是否需要删除旧记录
-const originalId = ref(null)
 
 // 默认空表单数据
 const getEmptyFormData = () => ({
@@ -141,11 +139,37 @@ const resetFormData = () => {
   formData.value = getEmptyFormData()
 }
 
+const validateStudentId = (_rule, value, callback) => {
+  const id = Number(value)
+  if (!Number.isInteger(id) || id <= 0) {
+    callback(new Error('学号必须是正整数'))
+    return
+  }
+  callback()
+}
+
+const validatePhone = (_rule, value, callback) => {
+  const phone = String(value || '').trim()
+  if (!/^\d{1,11}$/.test(phone)) {
+    callback(new Error('电话必须是 1 到 11 位数字'))
+    return
+  }
+  callback()
+}
+
 const rules = {
-  ID: [{ required: true, message: '请输入学号', trigger: 'blur' }],
+  ID: [
+    { required: true, message: '请输入学号', trigger: 'blur' },
+    { validator: validateStudentId, trigger: 'blur' }
+  ],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   role: [{ required: true, message: '请选择职位', trigger: 'change' }],
-  tele: [{ required: true, message: '请输入电话', trigger: 'blur' }]
+  tele: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { validator: validatePhone, trigger: 'blur' }
+  ],
+  gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  age: [{ required: true, message: '请输入年龄', trigger: 'change' }]
 }
 
 const load = () => {
@@ -206,7 +230,6 @@ watch(
 // 打开新增对话框
 const openAddDialog = () => {
   isAdd.value = true
-  originalId.value = null
   const teamId = getTeamId()
 
   // 重置为空表单
@@ -219,8 +242,6 @@ const openAddDialog = () => {
 // 打开编辑对话框
 const openEditDialog = (row) => {
   isAdd.value = false
-  // 保存原学号
-  originalId.value = row.ID || row.id
 
   // 设置表单为要编辑的成员信息
   formData.value = {
@@ -250,16 +271,23 @@ const handleSubmit = () => {
     return
   }
 
+  const studentId = Number(formData.value.ID)
+  if (!Number.isInteger(studentId) || studentId <= 0) {
+    ElMessage.error('学号必须是正整数')
+    return
+  }
+
   const submitData = {
-    ID: Number(formData.value.ID),
-    name: formData.value.name,
+    ID: studentId,
+    name: String(formData.value.name || '').trim(),
     role: formData.value.role,
-    tele: formData.value.tele,
+    tele: String(formData.value.tele || '').trim(),
     gender: formData.value.gender,
     age: formData.value.age,
     team_ID: teamId
   }
 
+  submitting.value = true
   if (isAdd.value) {
     // 新增：使用 POST
     request.post('/student/add', submitData).then(res => {
@@ -269,22 +297,17 @@ const handleSubmit = () => {
         // 重置表单
         resetFormData()
         load()
-        window.dispatchEvent(new CustomEvent('member-deleted'))
+        window.dispatchEvent(new CustomEvent('member-changed'))
       } else {
         ElMessage.error(res.msg || '新增失败')
       }
     }).catch(err => {
       console.error('新增失败:', err)
-      ElMessage.error('新增失败')
+    }).finally(() => {
+      submitting.value = false
     })
   } else {
-    // 编辑：传递原学号参数
-    const url = originalId.value && originalId.value !== formData.value.ID
-        ? `/student/update?oldId=${originalId.value}`
-        : '/student/update'
-
-
-    request.put(url, submitData).then(res => {
+    request.put('/student/update', submitData).then(res => {
       if (res.code === '200') {
         ElMessage.success('修改成功')
         dialogVisible.value = false
@@ -296,7 +319,8 @@ const handleSubmit = () => {
       }
     }).catch(err => {
       console.error('修改失败:', err)
-      ElMessage.error('修改失败')
+    }).finally(() => {
+      submitting.value = false
     })
   }
 }
@@ -309,6 +333,8 @@ const handleDelete = (row) => {
           if (res.code === '200') {
             ElMessage.success('删除成功')
             load()
+            window.dispatchEvent(new CustomEvent('member-deleted'))
+            window.dispatchEvent(new CustomEvent('member-changed'))
             if (window.location.pathname === '/team/profile') {
               window.location.reload()
             }

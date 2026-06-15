@@ -33,11 +33,16 @@ public class AdminService {
     }
 
     public void add(Admin admin) {
+        validateForSave(admin, true);
+        if (adminMapper.selectByteacher_ID(admin.getTeacher_ID()) != null) {
+            throw new IllegalArgumentException("管理员工号已存在");
+        }
         admin.setPassword(passwordService.encodeIfNeeded(admin.getPassword()));
         adminMapper.insert(admin);
     }
 
     public void update(Admin admin) {
+        validateForSave(admin, false);
         admin.setPassword(passwordService.encodeIfNeeded(admin.getPassword()));
         adminMapper.updateByteacher_ID(admin);
     }
@@ -48,5 +53,33 @@ public class AdminService {
 
     public void delBatch(List<Integer> teacher_IDs) {
         adminMapper.delBatch(teacher_IDs);
+    }
+
+    private void validateForSave(Admin admin, boolean requirePassword) {
+        if (admin == null) {
+            throw new IllegalArgumentException("管理员信息不能为空");
+        }
+        if (admin.getTeacher_ID() == null) {
+            throw new IllegalArgumentException("管理员工号不能为空");
+        }
+        if (isBlank(admin.getName())) {
+            throw new IllegalArgumentException("姓名不能为空");
+        }
+        if (requirePassword && isBlank(admin.getPassword())) {
+            throw new IllegalArgumentException("密码不能为空");
+        }
+        if (isBlank(admin.getTele())) {
+            throw new IllegalArgumentException("电话不能为空");
+        }
+        if (isBlank(admin.getGender())) {
+            throw new IllegalArgumentException("性别不能为空");
+        }
+        if (admin.getAge() == null) {
+            throw new IllegalArgumentException("年龄不能为空");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

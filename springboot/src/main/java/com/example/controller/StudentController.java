@@ -57,6 +57,8 @@ public class StudentController {
                 studentService.updateTeamNumber(student.getTeam_ID());
             }
             return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
         } catch (Exception e) {
             log.error("新增成员失败: ", e);
             return Result.error("新增成员失败: " + e.getMessage());
@@ -66,6 +68,7 @@ public class StudentController {
     @PutMapping("/update")
     public Result update(@RequestBody Student student) {
         try {
+            Student oldStudent = student.getID() == null ? null : studentService.selectByID(student.getID());
             if (!canAccessStudent(student.getID())) {
                 return forbidden();
             }
@@ -73,7 +76,15 @@ public class StudentController {
                 student.setTeam_ID(currentUser().getId());
             }
             studentService.update(student);
+            if (oldStudent != null && oldStudent.getTeam_ID() != null) {
+                studentService.updateTeamNumber(oldStudent.getTeam_ID());
+            }
+            if (student.getTeam_ID() != null && (oldStudent == null || !student.getTeam_ID().equals(oldStudent.getTeam_ID()))) {
+                studentService.updateTeamNumber(student.getTeam_ID());
+            }
             return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
         } catch (Exception e) {
             log.error("更新成员失败: ", e);
             return Result.error("更新成员失败: " + e.getMessage());

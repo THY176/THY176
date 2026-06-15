@@ -91,20 +91,20 @@ const handleUpdate = () => {
   })
 }
 
-// 监听成员删除事件
-const handleMemberDeleted = () => {
+// 监听成员变更事件
+const handleMemberChanged = () => {
   loadInfo()
 }
 
 onMounted(() => {
   loadInfo()
   // 监听自定义事件
-  window.addEventListener('member-deleted', handleMemberDeleted)
+  window.addEventListener('member-changed', handleMemberChanged)
 })
 
 onUnmounted(() => {
   // 移除事件监听
-  window.removeEventListener('member-deleted', handleMemberDeleted)
+  window.removeEventListener('member-changed', handleMemberChanged)
 })
 </script>
 

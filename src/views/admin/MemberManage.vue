@@ -110,11 +110,37 @@ const formData = reactive({
   team_ID: ''
 })
 
+const validateStudentId = (_rule, value, callback) => {
+  const id = Number(value)
+  if (!Number.isInteger(id) || id <= 0) {
+    callback(new Error('学号必须是正整数'))
+    return
+  }
+  callback()
+}
+
+const validatePhone = (_rule, value, callback) => {
+  const phone = String(value || '').trim()
+  if (!/^\d{1,11}$/.test(phone)) {
+    callback(new Error('电话必须是 1 到 11 位数字'))
+    return
+  }
+  callback()
+}
+
 const rules = {
-  ID: [{ required: true, message: '请输入学号', trigger: 'blur' }],
+  ID: [
+    { required: true, message: '请输入学号', trigger: 'blur' },
+    { validator: validateStudentId, trigger: 'blur' }
+  ],
   name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
   role: [{ required: true, message: '请选择职位', trigger: 'change' }],
-  tele: [{ required: true, message: '请输入电话', trigger: 'blur' }],
+  tele: [
+    { required: true, message: '请输入电话', trigger: 'blur' },
+    { validator: validatePhone, trigger: 'blur' }
+  ],
+  gender: [{ required: true, message: '请选择性别', trigger: 'change' }],
+  age: [{ required: true, message: '请输入年龄', trigger: 'change' }],
   team_ID: [{ required: true, message: '请选择所属社团', trigger: 'change' }]
 }
 
@@ -215,11 +241,12 @@ const handleSubmit = () => {
 
     if (isAdd.value) {
       // 新增：使用 POST
+      const studentId = Number(formData.ID)
       const submitData = {
-        ID: Number(formData.ID),
-        name: formData.name,
+        ID: studentId,
+        name: String(formData.name || '').trim(),
         role: formData.role,
-        tele: formData.tele,
+        tele: String(formData.tele || '').trim(),
         gender: formData.gender,
         age: formData.age,
         team_ID: formData.team_ID
@@ -234,17 +261,17 @@ const handleSubmit = () => {
         }
       }).catch(err => {
         console.error('新增失败:', err)
-        ElMessage.error('新增失败')
       }).finally(() => {
         submitting.value = false
       })
     } else {
       // 编辑：使用 PUT
+      const studentId = Number(formData.ID)
       const submitData = {
-        ID: Number(formData.ID),
-        name: formData.name,
+        ID: studentId,
+        name: String(formData.name || '').trim(),
         role: formData.role,
-        tele: formData.tele,
+        tele: String(formData.tele || '').trim(),
         gender: formData.gender,
         age: formData.age,
         team_ID: formData.team_ID
@@ -259,7 +286,6 @@ const handleSubmit = () => {
         }
       }).catch(err => {
         console.error('修改失败:', err)
-        ElMessage.error('修改失败')
       }).finally(() => {
         submitting.value = false
       })

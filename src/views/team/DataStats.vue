@@ -492,7 +492,7 @@ const handleDataRefresh = () => {
 onMounted(() => {
   loadStats()
   nextTick(observeChartContainers)
-  window.addEventListener('member-deleted', handleDataRefresh)
+  window.addEventListener('member-changed', handleDataRefresh)
   window.addEventListener('apply-updated', handleDataRefresh)
   window.addEventListener('reimburse-changed', handleDataRefresh)
   window.addEventListener('resize', resizeCharts)
@@ -506,7 +506,7 @@ onActivated(() => {
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('member-deleted', handleDataRefresh)
+  window.removeEventListener('member-changed', handleDataRefresh)
   window.removeEventListener('apply-updated', handleDataRefresh)
   window.removeEventListener('reimburse-changed', handleDataRefresh)
   window.removeEventListener('resize', resizeCharts)

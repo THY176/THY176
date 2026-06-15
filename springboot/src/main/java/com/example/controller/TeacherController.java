@@ -48,24 +48,32 @@ public class TeacherController {
 
     @PostMapping("/add")
     public Result add(@RequestBody Teacher teacher) {
-        teacherService.add(teacher);
-        return Result.success();
+        try {
+            teacherService.add(teacher);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
+        }
     }
 
     @PutMapping("/update")
     public Result update(@RequestBody Teacher teacher) {
-        if (isTeacherUser()) {
-            if (teacher.getTeacher_ID() != null && !currentUser().getId().equals(teacher.getTeacher_ID())) {
-                return forbidden();
+        try {
+            if (isTeacherUser()) {
+                if (teacher.getTeacher_ID() != null && !currentUser().getId().equals(teacher.getTeacher_ID())) {
+                    return forbidden();
+                }
+                Teacher existing = teacherService.selectByteacher_ID(currentUser().getId());
+                teacher.setTeacher_ID(currentUser().getId());
+                if (existing != null) {
+                    teacher.setTeam_ID(existing.getTeam_ID());
+                }
             }
-            Teacher existing = teacherService.selectByteacher_ID(currentUser().getId());
-            teacher.setTeacher_ID(currentUser().getId());
-            if (existing != null) {
-                teacher.setTeam_ID(existing.getTeam_ID());
-            }
+            teacherService.update(teacher);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
         }
-        teacherService.update(teacher);
-        return Result.success();
     }
 
     @DeleteMapping("/delByteacher_ID/{teacher_ID}")

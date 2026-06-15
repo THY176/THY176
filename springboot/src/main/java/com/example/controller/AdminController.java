@@ -41,14 +41,22 @@ public class AdminController {
 
     @PostMapping("/add")
     public Result add(@RequestBody Admin admin) {
-        adminService.add(admin);
-        return Result.success();
+        try {
+            adminService.add(admin);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
+        }
     }
 
     @PutMapping("/update")
     public Result update(@RequestBody Admin admin) {
-        adminService.update(admin);
-        return Result.success();
+        try {
+            adminService.update(admin);
+            return Result.success();
+        } catch (IllegalArgumentException e) {
+            return Result.error("400", e.getMessage());
+        }
     }
 
     @DeleteMapping("/delByteacher_ID/{teacher_ID}")

@@ -37,11 +37,16 @@ public class StudentService {
 
     @Transactional
     public void add(Student student) {
+        validateForSave(student);
+        if (studentMapper.selectByID(student.getID()) != null) {
+            throw new IllegalArgumentException("学号已存在");
+        }
         studentMapper.insert(student);
     }
 
     @Transactional
     public void update(Student student) {
+        validateForSave(student);
         studentMapper.replace(student);
     }
 
@@ -85,5 +90,39 @@ public class StudentService {
     // 统计社团人数
     public int countByTeamId(Integer teamId) {
         return studentMapper.countByTeamId(teamId);
+    }
+
+    private void validateForSave(Student student) {
+        if (student == null) {
+            throw new IllegalArgumentException("成员信息不能为空");
+        }
+        if (student.getID() == null) {
+            throw new IllegalArgumentException("学号不能为空");
+        }
+        if (student.getTeam_ID() == null) {
+            throw new IllegalArgumentException("所属社团不能为空");
+        }
+        if (teamMapper.selectByteam_ID(student.getTeam_ID()) == null) {
+            throw new IllegalArgumentException("所属社团不存在");
+        }
+        if (isBlank(student.getName())) {
+            throw new IllegalArgumentException("姓名不能为空");
+        }
+        if (isBlank(student.getRole())) {
+            throw new IllegalArgumentException("职位不能为空");
+        }
+        if (isBlank(student.getTele())) {
+            throw new IllegalArgumentException("电话不能为空");
+        }
+        if (isBlank(student.getGender())) {
+            throw new IllegalArgumentException("性别不能为空");
+        }
+        if (student.getAge() == null) {
+            throw new IllegalArgumentException("年龄不能为空");
+        }
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
